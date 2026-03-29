@@ -1,0 +1,17 @@
+# Yrvera-20k configuration — copy to config.toml and adjust paths.
+# config.toml is gitignored because it contains machine-specific paths.
+
+[paths]
+# Point this to your Red Alert 2: Yuri's Revenge installation directory.
+# The engine reads .mix files directly from here (ra2.mix, language.mix, etc.)
+ra2_dir = "C:/Westwood/RA2"
+
+[graphics]
+width = 1024
+height = 768
+vsync = true
+
+
+[gameplay]
+sim_tick_hz = 15
+input_delay_ticks = 2

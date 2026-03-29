@@ -1,0 +1,33 @@
+# Build
+/target
+
+# Config
+config.toml
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Generated / temporary
+*.png
+*.log
+*.txt
+*.tmp
+*.map
+
+# Retail INI files (loaded from .mix archives at runtime)
+/ini/
+
+# RE docs (kept locally outside the repo)
+/docs/
+
+# Local dev config (personal paths, Claude/Ghidra setup)
+CLAUDE.md
+.mcp.json
+/.claude/
+/todo/
+/logs/

@@ -1,0 +1,96 @@
+[package]
+name = "yrvera-20k"
+version = "0.1.0"
+edition = "2024"
+description = "Yrvera-20k Engine — a from-scratch Rust engine for Red Alert 2: Yuri's Revenge"
+autobins = false
+
+# Main game client
+[[bin]]
+name = "yrvera"
+path = "src/main.rs"
+
+[[bin]]
+name = "mix-browser"
+path = "src/bin/mix-browser.rs"
+
+[dependencies]
+# --- GPU rendering ---
+# wgpu 27 is the latest version compatible with egui-wgpu 0.33 (requires ^27.0.1).
+# wgpu 28 exists but egui-wgpu doesn't support it yet (March 2026).
+wgpu = "27"
+# winit 0.30 is the latest stable. 0.31 is still in beta.
+# Uses the ApplicationHandler trait pattern (deferred window creation).
+winit = "0.30"
+# pollster bridges wgpu's async initialization inside winit's sync event loop.
+pollster = "0.4"
+# bytemuck enables safe transmutation of structs to GPU-friendly byte slices.
+bytemuck = { version = "1", features = ["derive"] }
+
+# --- UI (menus and dialogs only — sidebar is custom wgpu) ---
+egui = "0.33"
+egui-wgpu = "0.33"
+# default-features=false drops the `links` feature which pulls in webbrowser → url → icu crates
+# that are currently incompatible with Rust 1.93+. We don't need egui hyperlink-opening.
+egui-winit = { version = "0.33", default-features = false }
+# eframe is egui's standalone app framework — used by tool binaries (mix-browser GUI).
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+
+# --- Math ---
+# glam provides fast vector/matrix math for rendering (screen coords, camera).
+glam = "0.29"
+# fixed-point math for deterministic simulation. ALL sim math uses this, never floats.
+# This ensures multiplayer lockstep stays in sync across different machines.
+fixed = "1"
+
+# --- Serialization ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ron = "0.8"
+# toml for config.toml parsing (game settings, asset paths).
+toml = "0.8"
+
+# --- Binary parsing ---
+# nom parses RA2's binary asset formats (.mix, .shp, .vxl, .pal, .tmp, .hva).
+# All parsers are written from scratch — no third-party RA2-specific crates.
+nom = "7"
+
+# --- Error handling ---
+# thiserror for structured library errors (AssetError, RulesError, etc.)
+thiserror = "2"
+# anyhow for application-level error propagation (main.rs, app.rs)
+anyhow = "1"
+
+# --- Logging ---
+log = "0.4"
+env_logger = "0.11"
+
+# --- Image processing ---
+# Used for texture atlas creation and debug image output, not for asset parsing.
+image = "0.25"
+
+# --- Crypto (for MIX archive header decryption) ---
+# RA2 .mix files encrypt their file index with Blowfish. The key is RSA-encrypted.
+# We use well-known RustCrypto/num crates — NOT any RA2-specific packages.
+# Blowfish block cipher — decrypts the file index in RA2 .mix archives.
+blowfish = "0.9"
+# Big integer arithmetic — RSA modular exponentiation to extract the Blowfish key.
+# Simpler than the full `rsa` crate since RA2 uses raw/textbook RSA (no PKCS padding).
+num-bigint = "0.4"
+num-traits = "0.2"
+
+# --- Audio ---
+# rodio is the standard Rust audio playback crate, maintained by the rust-audio org
+# (same team behind cpal). Covers all RA2 needs: SFX, music, volume control.
+rodio = "0.22"
+
+# --- Build speed ---
+# Optimize all code at opt-level 1 in dev builds. The game rebuilds sprite
+# instances, sorts them, and iterates over thousands of cells every frame —
+# unoptimized Rust is 10-50x slower than opt-level 1. Incremental recompiles
+# stay fast because opt-level 1 is lightweight (no heavy inlining/LTO).
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 1
