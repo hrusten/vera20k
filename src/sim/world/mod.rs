@@ -54,7 +54,7 @@ use crate::sim::radar::{RadarEventQueue, RadarEventType};
 use crate::map::actions::ActionMap;
 use crate::map::events::EventMap;
 use crate::map::trigger_graph::TriggerGraph;
-use crate::map::trigger_runtime::{TriggerEffect, TriggerRuntime};
+use crate::sim::trigger_runtime::{TriggerEffect, TriggerRuntime};
 use crate::map::triggers::TriggerMap;
 use crate::sim::replay::ReplayLog;
 use crate::sim::rng::SimRng;
