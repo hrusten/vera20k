@@ -6,9 +6,9 @@ Red Alert 2: Yuri's Revenge — rebuilt from scratch in Rust for large multiplay
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4jTp4VcdY)
 
-Main repository for the **Yrvera-20k Engine** and **Yrvera-20k: Allied Uprising**, a standalone game built on RA2:YR game assets.
+Main repository for the **vera20k Engine** and **vera20k: Allied Uprising**, a standalone game built on RA2:YR game assets.
 
-This project stands on the shoulders of giants. Thanks to OpenRA team, ModEnc team, PPM team, EA for open source RA1, Modders, World Altering Editor, Final Alert,YRpp and much more.
+This project stands on the shoulders of giants. Thanks to OpenRA team, XCC mixer, ModEnc team, PPM team, EA for open source RA1, Modders, World Altering Editor, Final Alert,YRpp, Ares, Phobos and much more.
 
 ---
 
@@ -16,21 +16,19 @@ This project stands on the shoulders of giants. Thanks to OpenRA team, ModEnc te
 
 ### 1. Faithful Engine Replacement
 
-A drop-in replacement for `gamemd.exe` that stays 100% true to the original Westwood RA2 visual fidelity, atmosphere, and gameplay. Built entirely on original game files.
+A drop-in replacement for `gamemd.exe` that stays 100% true to the original Westwood RA2 visual fidelity, atmosphere, and gameplay.
 
 ### 2. Built for Scale
 
-Engineered from the ground up for large multiplayer — targeting support for up to **30 players** and **20,000 units** on significantly bigger maps.
+Constructed from the ground up for large multiplayer — targeting support for up to **30 players** and **20,000 units** on significantly bigger maps.
 
-### 3. Quality-of-Life Improvements
 
-Modernized battle controls while preserving the RA2 feel — formation movement, area commands, and more.
 
-### 4. Integrated Multiplayer Client
+### 3. Integrated Multiplayer Client
 
 A multiplayer client embedded directly into the game, supporting both original RA2:YR and Allied Uprising. Built to handle 30-player lobbies and designed to minimize cheating, lag, and toxic behavior.
 
-### 5. Allied Uprising
+### 4. Allied Uprising
 
 A full game built on the Yrvera-20k engine using RA2:YR game assets. Same Westwood RA2 atmosphere and core gameplay, but with added strategic depth tailored for large team games, co-op, and FFA.
 
@@ -53,7 +51,7 @@ Feature scope is still being defined:
 
 ## Current Status
  
-**Early development** — Work is focused on the core engine. Approximately 10% complete.
+**Early development** — Work is focused on the core engine. Approximately 15% complete.
 
 
 ## Requirements
@@ -91,4 +89,3 @@ Feature scope is still being defined:
 ## License
 
 - [GNU General Public License v3.0](LICENSE-GPL)
-- [European Union Public License v1.2](LICENSE-EUPL)
