@@ -3711,6 +3711,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "vera20k"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blowfish",
+ "bytemuck",
+ "eframe",
+ "egui",
+ "egui-wgpu",
+ "egui-winit",
+ "env_logger",
+ "fixed",
+ "glam",
+ "image",
+ "log",
+ "nom 7.1.3",
+ "num-bigint",
+ "num-traits",
+ "pollster",
+ "rodio",
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4750,36 +4780,6 @@ dependencies = [
  "quote",
  "syn",
  "synstructure",
-]
-
-[[package]]
-name = "yrvera-20k"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blowfish",
- "bytemuck",
- "eframe",
- "egui",
- "egui-wgpu",
- "egui-winit",
- "env_logger",
- "fixed",
- "glam",
- "image",
- "log",
- "nom 7.1.3",
- "num-bigint",
- "num-traits",
- "pollster",
- "rodio",
- "ron",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "toml",
- "wgpu",
- "winit",
 ]
 
 [[package]]

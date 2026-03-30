@@ -12,11 +12,11 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::tmp_file::TmpFile;
-use yrvera_20k::map::map_file;
-use yrvera_20k::map::terrain;
-use yrvera_20k::map::theater::{self, TileKey};
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::tmp_file::TmpFile;
+use vera20k::map::map_file;
+use vera20k::map::terrain;
+use vera20k::map::theater::{self, TileKey};
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")
@@ -300,7 +300,7 @@ fn pct(n: usize, total: usize) -> f64 {
     }
 }
 
-fn load_first_map(ra2_dir: &Path, names: &[&str]) -> yrvera_20k::map::map_file::MapFile {
+fn load_first_map(ra2_dir: &Path, names: &[&str]) -> vera20k::map::map_file::MapFile {
     for &name in names {
         let path = ra2_dir.join(name);
         if path.exists() {

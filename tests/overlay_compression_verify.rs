@@ -8,9 +8,9 @@
 //!
 //! Run with: cargo test --test overlay_compression_verify -- --nocapture
 
-use yrvera_20k::util::base64;
-use yrvera_20k::util::lcw;
-use yrvera_20k::util::lzo;
+use vera20k::util::base64;
+use vera20k::util::lcw;
+use vera20k::util::lzo;
 use std::path::Path;
 
 fn ra2_dir() -> String {
@@ -25,7 +25,7 @@ fn is_ore(id: u8) -> bool {
     matches!(id, 27..=38 | 102..=121 | 127..=166)
 }
 
-fn load_raw_overlay_pack_from_map(map: &yrvera_20k::map::map_file::MapFile) -> Vec<u8> {
+fn load_raw_overlay_pack_from_map(map: &vera20k::map::map_file::MapFile) -> Vec<u8> {
     let section = map.ini.section("OverlayPack").expect("OverlayPack section");
     let mut b64: String = String::new();
     for key in section.keys() {
@@ -64,7 +64,7 @@ fn lcw_vs_lzo_on_real_overlay_pack() {
     }
 
     let map_path = ra2_dir.join("Dustbowl.mmx");
-    let map = yrvera_20k::map::map_file::load_mmx(&map_path).expect("load map");
+    let map = vera20k::map::map_file::load_mmx(&map_path).expect("load map");
     let raw = load_raw_overlay_pack_from_map(&map);
     println!("Raw base64-decoded OverlayPack: {} bytes", raw.len());
     println!("First 16 raw bytes: {:02X?}", &raw[..16.min(raw.len())]);
@@ -163,7 +163,7 @@ fn overlay_pack_first_bytes_identify_codec() {
     }
 
     let map_path = ra2_dir.join("Dustbowl.mmx");
-    let map = yrvera_20k::map::map_file::load_mmx(&map_path).expect("load map");
+    let map = vera20k::map::map_file::load_mmx(&map_path).expect("load map");
     let raw = load_raw_overlay_pack_from_map(&map);
 
     if raw.len() < 8 {

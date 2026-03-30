@@ -10,7 +10,7 @@ use std::path::Path;
 fn extract_original_ini_files() {
     let game_dir = match std::env::var("RA2_DIR") {
         Ok(val) => std::path::PathBuf::from(val),
-        Err(_) => match yrvera_20k::util::config::GameConfig::load() {
+        Err(_) => match vera20k::util::config::GameConfig::load() {
             Ok(cfg) => cfg.paths.ra2_dir,
             Err(_) => {
                 eprintln!("SKIPPED: RA2_DIR not set and config.toml not found");
@@ -23,7 +23,7 @@ fn extract_original_ini_files() {
         return;
     }
 
-    let am = yrvera_20k::assets::asset_manager::AssetManager::new(&game_dir)
+    let am = vera20k::assets::asset_manager::AssetManager::new(&game_dir)
         .expect("Failed to load asset manager");
 
     let ini_dir = Path::new("ini");

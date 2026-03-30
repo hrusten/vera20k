@@ -5,12 +5,12 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::map::{map_file, theater};
-use yrvera_20k::rules::art_data::ArtRegistry;
-use yrvera_20k::rules::ini_parser::IniFile;
-use yrvera_20k::rules::ruleset::RuleSet;
-use yrvera_20k::sim::pathfinding::PathGrid;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::map::{map_file, theater};
+use vera20k::rules::art_data::ArtRegistry;
+use vera20k::rules::ini_parser::IniFile;
+use vera20k::rules::ruleset::RuleSet;
+use vera20k::sim::pathfinding::PathGrid;
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")

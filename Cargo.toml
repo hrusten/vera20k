@@ -1,8 +1,8 @@
 [package]
-name = "yrvera-20k"
+name = "vera20k"
 version = "0.1.0"
 edition = "2024"
-description = "Yrvera-20k Engine — a from-scratch Rust engine for Red Alert 2: Yuri's Revenge"
+description = "Vera20k Engine — a from-scratch Rust engine for Red Alert 2: Yuri's Revenge"
 autobins = false
 
 # Main game client

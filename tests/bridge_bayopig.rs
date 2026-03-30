@@ -1,10 +1,10 @@
 //! Inspect bridge overlays in BayoPig map.
 //! Run with: cargo test --test bridge_bayopig -- --nocapture
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::map::map_file::MapFile;
-use yrvera_20k::map::overlay_types::OverlayTypeRegistry;
-use yrvera_20k::rules::ini_parser::IniFile;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::map::map_file::MapFile;
+use vera20k::map::overlay_types::OverlayTypeRegistry;
+use vera20k::rules::ini_parser::IniFile;
 use std::path::Path;
 
 fn ra2_dir() -> String {
@@ -112,7 +112,7 @@ fn dump_bridge_shp_frames() {
         let _ = am.load_nested(mix);
     }
 
-    use yrvera_20k::assets::shp_file::ShpFile;
+    use vera20k::assets::shp_file::ShpFile;
     // BRIDGE1/BRIDGE2 share [BRIDGE] art entry, BRIDGEB1/B2 share [BRIDGB]
     // Theater=yes means file is e.g. bridge.tem, bridgb.tem
     for name in &[

@@ -4,7 +4,7 @@
 //! searchable two-column table of label → value pairs.
 
 use eframe::egui;
-use yrvera_20k::assets::csf_file::CsfFile;
+use vera20k::assets::csf_file::CsfFile;
 
 /// Parsed CSF data ready for display.
 pub struct CsfBrowserState {

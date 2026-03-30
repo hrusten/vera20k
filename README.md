@@ -64,8 +64,8 @@ Feature scope is still being defined:
 
 1. Clone the repo:
    ```
-   git clone https://github.com/hrusten/yrvera-20k.git
-   cd yrvera-20k
+   git clone https://github.com/hrusten/vera20k.git
+   cd vera20k
    ```
 
 2. Copy the example config and set your RA2 install path:

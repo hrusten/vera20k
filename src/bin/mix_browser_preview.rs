@@ -5,11 +5,11 @@
 
 use crate::mix_browser_renderers;
 use eframe::egui;
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::assets::shp_file::ShpFile;
-use yrvera_20k::assets::tmp_file::TmpFile;
-use yrvera_20k::rules::art_data::ArtRegistry;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::pal_file::Palette;
+use vera20k::assets::shp_file::ShpFile;
+use vera20k::assets::tmp_file::TmpFile;
+use vera20k::rules::art_data::ArtRegistry;
 
 /// State for the currently previewed asset in the right panel.
 pub struct PreviewState {

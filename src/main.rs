@@ -9,7 +9,7 @@ use anyhow::Result;
 use winit::event_loop::EventLoop;
 
 fn main() -> Result<()> {
-    let log_path = match yrvera_20k::util::logging::init_file_logger("ra2") {
+    let log_path = match vera20k::util::logging::init_file_logger("ra2") {
         Ok(path) => {
             eprintln!("Logging to {}", path.display());
             Some(path)
@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     };
 
     if let Some(path) = &log_path {
-        yrvera_20k::util::logging::install_panic_hook(path);
+        vera20k::util::logging::install_panic_hook(path);
     }
 
     log::info!("RA2 Engine starting");
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
 
     // Create the app and hand control to the event loop.
     // This blocks until the window is closed.
-    let mut app: yrvera_20k::app::App = yrvera_20k::app::App::new();
+    let mut app: vera20k::app::App = vera20k::app::App::new();
     event_loop.run_app(&mut app)?;
 
     log::info!("RA2 Engine shut down cleanly");

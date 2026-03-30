@@ -1,6 +1,6 @@
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::assets::shp_file::ShpFile;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::pal_file::Palette;
+use vera20k::assets::shp_file::ShpFile;
 use std::path::Path;
 
 fn ra2_dir() -> String {

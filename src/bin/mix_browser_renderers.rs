@@ -4,8 +4,8 @@
 //! Supports PAL grid, TMP terrain tiles, and (future) VXL voxel models.
 
 use eframe::egui;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::assets::tmp_file::TmpFile;
+use vera20k::assets::pal_file::Palette;
+use vera20k::assets::tmp_file::TmpFile;
 
 /// Cell size in pixels for each palette entry in the 16x16 grid.
 const PAL_CELL_SIZE: usize = 16;

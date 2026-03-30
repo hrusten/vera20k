@@ -7,9 +7,9 @@
 
 use std::path::PathBuf;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::mix_archive::MixArchive;
-use yrvera_20k::assets::mix_hash::mix_hash;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::mix_archive::MixArchive;
+use vera20k::assets::mix_hash::mix_hash;
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")

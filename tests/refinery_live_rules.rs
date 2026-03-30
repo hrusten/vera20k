@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::map::entities::EntityCategory;
-use yrvera_20k::rules::art_data::ArtRegistry;
-use yrvera_20k::rules::ini_parser::IniFile;
-use yrvera_20k::rules::ruleset::RuleSet;
-use yrvera_20k::sim::pathfinding::PathGrid;
-use yrvera_20k::sim::production::place_ready_building;
-use yrvera_20k::sim::world::Simulation;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::map::entities::EntityCategory;
+use vera20k::rules::art_data::ArtRegistry;
+use vera20k::rules::ini_parser::IniFile;
+use vera20k::rules::ruleset::RuleSet;
+use vera20k::sim::pathfinding::PathGrid;
+use vera20k::sim::production::place_ready_building;
+use vera20k::sim::world::Simulation;
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")
@@ -129,8 +129,8 @@ fn real_garefn_placement_spawns_cmin() {
     sim.spawn_object("GACNST", "Americans", 18, 18, 0, &rules, &height_map)
         .expect("construction yard should spawn");
     sim.production.ready_by_owner.insert(
-        yrvera_20k::sim::intern::test_intern("Americans"),
-        VecDeque::from([yrvera_20k::sim::intern::test_intern("GAREFN")]),
+        vera20k::sim::intern::test_intern("Americans"),
+        VecDeque::from([vera20k::sim::intern::test_intern("GAREFN")]),
     );
 
     assert!(place_ready_building(

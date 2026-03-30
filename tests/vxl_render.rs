@@ -4,12 +4,12 @@
 
 use std::path::Path;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::hva_file::HvaFile;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::assets::vpl_file::VplFile;
-use yrvera_20k::assets::vxl_file::VxlFile;
-use yrvera_20k::render::vxl_raster::{render_vxl, VxlRenderParams, VxlSprite};
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::hva_file::HvaFile;
+use vera20k::assets::pal_file::Palette;
+use vera20k::assets::vpl_file::VplFile;
+use vera20k::assets::vxl_file::VxlFile;
+use vera20k::render::vxl_raster::{render_vxl, VxlRenderParams, VxlSprite};
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")

@@ -1,7 +1,7 @@
 //! Debug test to trace why audio.idx can't be found.
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::mix_hash::mix_hash;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::mix_hash::mix_hash;
 use std::path::Path;
 
 fn ra2_dir() -> String {

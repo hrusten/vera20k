@@ -1,7 +1,7 @@
 //! Inspect BUILDNGZ.SHA to understand its contents for Z-buffer implementation.
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::shp_file::ShpFile;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::shp_file::ShpFile;
 use std::path::Path;
 
 fn ra2_dir() -> String {

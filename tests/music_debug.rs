@@ -1,7 +1,7 @@
 //! Debug test to diagnose why music doesn't play.
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::rules::ini_parser::IniFile;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::rules::ini_parser::IniFile;
 use std::path::Path;
 
 fn ra2_dir() -> String {

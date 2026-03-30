@@ -15,12 +15,12 @@ mod mix_browser_ui;
 use eframe::egui;
 use mix_browser_data::{build_best_dictionary, load_mix_contents, ShpIndex};
 use mix_browser_preview::PreviewState;
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::rules::art_data::ArtRegistry;
-use yrvera_20k::rules::house_colors::{self, HouseColorIndex};
-use yrvera_20k::rules::ini_parser::IniFile;
-use yrvera_20k::util::config::GameConfig;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::pal_file::Palette;
+use vera20k::rules::art_data::ArtRegistry;
+use vera20k::rules::house_colors::{self, HouseColorIndex};
+use vera20k::rules::ini_parser::IniFile;
+use vera20k::util::config::GameConfig;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BrowserViewMode {
@@ -445,7 +445,7 @@ impl MixBrowserApp {
         } else if let Some(raw) = &preview.raw_bytes {
             // TMP re-render.
             if preview.file_type.starts_with("TMP") {
-                if let Ok(tmp) = yrvera_20k::assets::tmp_file::TmpFile::from_bytes(raw) {
+                if let Ok(tmp) = vera20k::assets::tmp_file::TmpFile::from_bytes(raw) {
                     if let Some((image, _)) =
                         mix_browser_renderers::render_tmp_preview(&tmp, &new_palette)
                     {
@@ -529,7 +529,7 @@ impl MixBrowserApp {
         } else if let Some(raw) = &preview.raw_bytes {
             // PAL grid: re-render it.
             if raw.len() == 768 {
-                if let Ok(pal) = yrvera_20k::assets::pal_file::Palette::from_bytes(raw) {
+                if let Ok(pal) = vera20k::assets::pal_file::Palette::from_bytes(raw) {
                     let img = mix_browser_renderers::render_palette_grid(&pal);
                     // egui::ColorImage pixels are [u8; 4] per pixel.
                     img.pixels

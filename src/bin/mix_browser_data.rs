@@ -1,9 +1,9 @@
 //! Shared data structures and helpers for the mix-browser tool.
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::mix_hash::mix_hash;
-use yrvera_20k::assets::shp_file::ShpFile;
-use yrvera_20k::assets::xcc_database::XccDatabase;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::mix_hash::mix_hash;
+use vera20k::assets::shp_file::ShpFile;
+use vera20k::assets::xcc_database::XccDatabase;
 
 const HASH_ALIASES: &[(i32, &str)] = &[(0x7AEBAE6Bu32 as i32, "unknown_top_housing.shp")];
 

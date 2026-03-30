@@ -6,13 +6,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::pal_file::Palette;
-use yrvera_20k::assets::shp_file::ShpFile;
-use yrvera_20k::map::map_file;
-use yrvera_20k::map::overlay_types::OverlayTypeRegistry;
-use yrvera_20k::map::terrain::{self, LocalBounds};
-use yrvera_20k::rules::ini_parser::IniFile;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::pal_file::Palette;
+use vera20k::assets::shp_file::ShpFile;
+use vera20k::map::map_file;
+use vera20k::map::overlay_types::OverlayTypeRegistry;
+use vera20k::map::terrain::{self, LocalBounds};
+use vera20k::rules::ini_parser::IniFile;
 
 fn ra2_dir() -> String {
     std::env::var("RA2_DIR")

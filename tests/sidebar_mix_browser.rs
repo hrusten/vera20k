@@ -5,10 +5,10 @@
 //!
 //! Run with: cargo test --test sidebar_mix_browser -- --nocapture
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::mix_archive::MixArchive;
-use yrvera_20k::assets::mix_hash::mix_hash;
-use yrvera_20k::util::config::GameConfig;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::mix_archive::MixArchive;
+use vera20k::assets::mix_hash::mix_hash;
+use vera20k::util::config::GameConfig;
 
 /// Build a massive dictionary of plausible sidebar filenames to reverse-lookup hashes.
 fn build_hash_dictionary() -> Vec<(String, i32)> {

@@ -2,9 +2,9 @@
 //!
 //! Tests that the full pipeline works: AssetManager → idx/bag → decode → playable samples.
 
-use yrvera_20k::assets::asset_manager::AssetManager;
-use yrvera_20k::assets::audio_bag::{decode_bag_audio, AudioIndex};
-use yrvera_20k::assets::mix_archive::MixArchive;
+use vera20k::assets::asset_manager::AssetManager;
+use vera20k::assets::audio_bag::{decode_bag_audio, AudioIndex};
+use vera20k::assets::mix_archive::MixArchive;
 use std::path::Path;
 
 fn ra2_dir() -> String {
@@ -193,8 +193,8 @@ fn test_lookup_eva_sounds() {
 
 #[test]
 fn test_sound_registry_with_real_soundmd() {
-    use yrvera_20k::rules::ini_parser::IniFile;
-    use yrvera_20k::rules::sound_ini::SoundRegistry;
+    use vera20k::rules::ini_parser::IniFile;
+    use vera20k::rules::sound_ini::SoundRegistry;
 
     let assets = AssetManager::new(Path::new(&ra2_dir())).expect("AssetManager");
 
@@ -224,8 +224,8 @@ fn test_sound_registry_with_real_soundmd() {
 
 #[test]
 fn test_eva_registry_with_real_evamd() {
-    use yrvera_20k::rules::ini_parser::IniFile;
-    use yrvera_20k::rules::sound_ini::EvaRegistry;
+    use vera20k::rules::ini_parser::IniFile;
+    use vera20k::rules::sound_ini::EvaRegistry;
 
     let assets = AssetManager::new(Path::new(&ra2_dir())).expect("AssetManager");
 

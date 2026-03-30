@@ -2,11 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use yrvera_20k::map::entities::{EntityCategory, MapEntity};
-use yrvera_20k::sim::command::{Command, CommandEnvelope};
-use yrvera_20k::sim::pathfinding::PathGrid;
-use yrvera_20k::sim::replay::{ReplayHeader, ReplayLog, ReplayRunner};
-use yrvera_20k::sim::world::Simulation;
+use vera20k::map::entities::{EntityCategory, MapEntity};
+use vera20k::sim::command::{Command, CommandEnvelope};
+use vera20k::sim::pathfinding::PathGrid;
+use vera20k::sim::replay::{ReplayHeader, ReplayLog, ReplayRunner};
+use vera20k::sim::world::Simulation;
 
 const TICK_MS: u32 = 33;
 
@@ -31,7 +31,7 @@ fn make_test_sim() -> Simulation {
 
 fn make_move_command() -> CommandEnvelope {
     CommandEnvelope::new(
-        yrvera_20k::sim::intern::test_intern("Americans"),
+        vera20k::sim::intern::test_intern("Americans"),
         1,
         Command::Move {
             entity_id: 1,
