@@ -55,7 +55,7 @@ const ADJACENT_OFFSETS: [(i32, i32); 8] = [
 /// Constructed once at map load. The resolution order is:
 /// map [SpecialFlags] > map [Basic] > rules.ini [General]
 /// All flags must be true for growth/spread to be active.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OreGrowthConfig {
     /// Whether ore cells grow denser over time.
     pub grows: bool,
@@ -117,7 +117,7 @@ impl OreGrowthConfig {
 /// Lives in ProductionState. The scanner processes a fraction of the map each
 /// tick and collects candidates via reservoir sampling (fair random selection
 /// from a stream of unknown length, bounded to MAX_CANDIDATES).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OreGrowthState {
     /// Current position in the cell iteration (wraps to 0 after full scan).
     scan_cursor: usize,

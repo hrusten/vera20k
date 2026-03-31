@@ -34,7 +34,7 @@ pub const PASS_IMPASSABLE: u8 = 3;
 /// These are the canonical indices into `PASSABILITY_MATRIX[layer][col]`.
 /// Raw TMP `terrain_type` bytes (0-15) must be mapped to these via
 /// `tmp_terrain_to_land_type()` before any matrix lookup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum LandType {
     Clear = 0,

@@ -28,7 +28,7 @@ use crate::rules::weapon_type::WeaponType;
 ///
 /// Used to resolve the correct FLH (firing offset) from art.ini:
 /// Primary → `PrimaryFireFLH`, Secondary → `SecondaryFireFLH`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum WeaponSlot {
     Primary,
     Secondary,

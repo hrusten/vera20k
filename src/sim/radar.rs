@@ -32,7 +32,7 @@ pub fn has_radar_for_owner(sim: &Simulation, rules: &RuleSet, owner: &str) -> bo
 /// Classification of radar events — determines ping color and EVA announcement.
 ///
 /// RA2 defines 6 event types per ModEnc's Action 55 documentation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum RadarEventType {
     /// Generic combat event (unit took or dealt damage).
     Combat,
@@ -63,7 +63,7 @@ impl RadarEventType {
 }
 
 /// A single radar event with position and age tracking.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RadarEvent {
     pub event_type: RadarEventType,
     /// Isometric cell X coordinate where the event occurred.
@@ -99,7 +99,7 @@ impl RadarEvent {
 ///
 /// Maintains up to `max_events` entries (default 8). Old events are evicted
 /// when the buffer is full. Spacebar cycles through the buffer for camera jump.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RadarEventQueue {
     events: VecDeque<RadarEvent>,
     max_events: usize,

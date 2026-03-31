@@ -874,7 +874,7 @@ pub(crate) fn clamp_cell_to_grid(
     (cell.0.min(max_x), cell.1.min(max_y))
 }
 
-fn rules_hash(rules: &crate::rules::ruleset::RuleSet) -> u64 {
+pub(crate) fn rules_hash(rules: &crate::rules::ruleset::RuleSet) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     rules.infantry_ids.hash(&mut hasher);
     rules.vehicle_ids.hash(&mut hasher);

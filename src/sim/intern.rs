@@ -101,6 +101,23 @@ impl Default for StringInterner {
     }
 }
 
+impl serde::Serialize for StringInterner {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_str.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringInterner {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let strings = Vec::<String>::deserialize(deserializer)?;
+        let mut to_id = BTreeMap::new();
+        for (i, s) in strings.iter().enumerate() {
+            to_id.insert(s.to_ascii_uppercase(), InternedId(i as u32));
+        }
+        Ok(StringInterner { to_id, to_str: strings })
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Test / convenience helpers
 // ---------------------------------------------------------------------------
@@ -156,6 +173,25 @@ mod tests {
     fn get_returns_none_for_unknown() {
         let interner = StringInterner::new();
         assert_eq!(interner.get("unknown"), None);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let mut interner = StringInterner::new();
+        let a = interner.intern("Americans");
+        let b = interner.intern("HTNK");
+        let c = interner.intern("Soviet");
+
+        let json = serde_json::to_string(&interner).unwrap();
+        let restored: StringInterner = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.len(), 3);
+        assert_eq!(restored.resolve(a), "Americans");
+        assert_eq!(restored.resolve(b), "HTNK");
+        assert_eq!(restored.resolve(c), "Soviet");
+        // Case-insensitive lookup still works after round-trip
+        assert_eq!(restored.get("americans"), Some(a));
+        assert_eq!(restored.get("htnk"), Some(b));
     }
 
     #[test]

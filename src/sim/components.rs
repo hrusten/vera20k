@@ -27,7 +27,7 @@ use crate::util::fixed_math::{SimFixed, SIM_ZERO};
 ///
 /// Screen coords are computed via `iso_to_screen(rx, ry, z)` and cached here
 /// so the render loop doesn't need to recompute every frame.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Position {
     /// Isometric cell X coordinate.
     pub rx: u16,
@@ -41,8 +41,10 @@ pub struct Position {
     /// Sub-cell lepton offset Y (0..256). 128 = cell center.
     pub sub_y: SimFixed,
     /// Pre-computed screen X position (pixels, world space).
+    #[serde(skip, default)]
     pub screen_x: f32,
     /// Pre-computed screen Y position (pixels, world space).
+    #[serde(skip, default)]
     pub screen_y: f32,
 }
 
@@ -61,7 +63,7 @@ impl Position {
 ///
 /// 0 = north, 64 = east, 128 = south, 192 = west.
 /// Used for sprite/voxel rotation and movement direction.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Facing(pub u8);
 
 /// Independent turret facing direction (0–255, RA2 convention).
@@ -70,18 +72,18 @@ pub struct Facing(pub u8);
 /// The turret rotates independently from the body: it tracks attack targets,
 /// and returns to body facing when idle.
 /// 0 = north, 64 = east, 128 = south, 192 = west.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TurretFacing(pub u8);
 
 /// Which player/faction owns this entity (legacy wrapper — prefer InternedId directly).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Owner(pub InternedId);
 
 /// Hit points â€” current and maximum health.
 ///
 /// When current reaches 0, the entity is destroyed.
 /// Max health comes from rules.ini Strength= value.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Health {
     /// Current HP (0 = destroyed).
     pub current: u16,
@@ -90,7 +92,7 @@ pub struct Health {
 }
 
 /// Vision radius in grid cells used for fog/shroud reveal.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Vision {
     /// Reveal/visibility radius in cells.
     pub range_cells: u16,
@@ -100,39 +102,39 @@ pub struct Vision {
 ///
 /// Vehicles and aircraft use voxel models. The render loop loads the
 /// corresponding VXL+HVA files and renders them via the software rasterizer.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct VoxelModel;
 
 /// Marker component: this entity is rendered as a SHP 2D sprite.
 ///
 /// Infantry and buildings use SHP sprites. Not yet wired to rendering â€”
 /// will be implemented when SHP sprite batching is added.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct SpriteModel;
 
 /// Which category this entity belongs to (unit, infantry, structure, aircraft).
 ///
 /// Wraps the map::entities::EntityCategory enum so it can be used as an ECS component.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Category(pub EntityCategory);
 
 /// Infantry sub-cell position (0–4).
 ///
 /// RA2 uses sub-cell spots 2, 3, 4 — up to 3 infantry per cell, each at a
 /// different sub-position. Only meaningful for infantry entities.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct SubCell(pub u8);
 
 /// Veterancy level: 0 = rookie, 100 = veteran, 200 = elite.
 ///
 /// Affects unit stats (damage, armor, speed bonuses) and visual indicators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Veterancy(pub u16);
 
 /// Marker component: this building is being repaired (spending credits to heal).
 ///
 /// Added by the ToggleRepair command. Removed when health is full or credits run out.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Repairing;
 
 /// Building construction animation state — plays the "make" SHP sequence.
@@ -143,7 +145,7 @@ pub struct Repairing;
 /// building switches to its normal idle appearance.
 ///
 /// The render side maps progress (elapsed/total) to make SHP frame indices.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct BuildingUp {
     /// Sim ticks elapsed since placement.
     pub elapsed_ticks: u16,
@@ -159,7 +161,7 @@ pub struct BuildingUp {
 ///
 /// The render side maps progress (elapsed/total) to make SHP frame indices
 /// counting backwards from the last frame.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuildingDown {
     /// Sim ticks elapsed since undeploy was initiated.
     pub elapsed_ticks: u16,
@@ -182,7 +184,7 @@ pub struct BuildingDown {
 ///
 /// Added/removed dynamically via `world.insert_one()` / `world.remove_one()`.
 /// The render loop queries for `Selected` to draw selection indicators.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Selected;
 
 /// Movement path target â€” entity is moving along a computed A* path.
@@ -190,7 +192,7 @@ pub struct Selected;
 /// Attached by `issue_move_command()` when a unit is ordered to move.
 /// The movement system (`tick_movement`) advances the entity along the path
 /// each tick. Removed automatically when the entity reaches its destination.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MovementTarget {
     /// Sequence of (rx, ry) cells from current position to goal (inclusive).
     pub path: Vec<(u16, u16)>,
@@ -298,7 +300,7 @@ impl MovementTarget {
 }
 
 /// Marker component: this entity currently occupies a bridge deck cell.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct BridgeOccupancy {
     pub deck_level: u8,
 }
@@ -307,7 +309,7 @@ pub struct BridgeOccupancy {
 ///
 /// This keeps intent like attack-move or guard alive while systems temporarily
 /// add/remove `MovementTarget` and `AttackTarget`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum OrderIntent {
     /// Move toward a destination but auto-acquire enemies along the way.
     AttackMove { goal_rx: u16, goal_ry: u16 },
@@ -322,7 +324,7 @@ pub enum OrderIntent {
 /// Non-turret units use `Composite` (body+turret+barrel baked together).
 /// Turret units store Body/Turret/Barrel separately so the turret can
 /// be drawn at a different facing than the body at render time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum VxlLayer {
     /// All parts composited into one sprite (for units without independent turret).
     Composite,
@@ -340,7 +342,7 @@ pub enum VxlLayer {
 /// Used for harvesting miners (arm/turret animation), and potentially other voxel
 /// units with multi-frame HVA files. The render loop reads `frame` to select
 /// the correct pre-rendered atlas sprite.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct VoxelAnimation {
     /// Current HVA frame index (0-based).
     pub frame: u32,
@@ -372,7 +374,7 @@ impl VoxelAnimation {
 /// Attached to harvester entities (HARV, CMIN). Shows the visual "sucking up ore"
 /// animation as an SHP overlay on top of the VXL body when actively harvesting.
 /// Uses the effect palette (anim.pal), independent of house colors.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct HarvestOverlay {
     /// Current animation frame (0..14, 15 frames per facing direction).
     pub frame: u16,
@@ -389,7 +391,7 @@ pub struct HarvestOverlay {
 /// - Green: > 50% HP (healthy)
 /// - Yellow: 25–50% HP (damaged, shows smoke)
 /// - Red: < 25% HP (heavily damaged, shows fire)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DamageState {
     Green,
     Yellow,
@@ -421,7 +423,7 @@ impl DamageState {
 ///
 /// Used for retaliation: when an idle unit takes damage, it automatically
 /// attacks the source. Still subject to Verses gates (0%/1% block retaliation).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct LastAttacker {
     /// Stable entity ID of the attacker that dealt the most recent damage.
     pub attacker: u64,
@@ -432,7 +434,7 @@ pub struct LastAttacker {
 /// Each active one-shot anim overlay gets its own entry tracking frame progress.
 /// Driven by art.ini LoopStart/LoopEnd/LoopCount/Rate properties from the
 /// anim's own section (e.g., [GACNST_B]).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnimOverlayState {
     /// Animation type interned ID (uppercase), e.g., "GACNST_B".
     pub anim_type: InternedId,
@@ -455,7 +457,7 @@ pub struct AnimOverlayState {
 /// Populated when a one-shot anim is triggered (e.g., placing a building triggers
 /// the ConYard crane). Cleared when the entity is despawned via EntityStore.remove().
 /// Infinite-loop anims (LoopCount=-1) are NOT stored here — they use a global timer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuildingAnimOverlays {
     pub anims: Vec<AnimOverlayState>,
 }
@@ -465,13 +467,13 @@ pub struct BuildingAnimOverlays {
 /// Separate from the 21-slot BuildingAnimOverlays system. Each fire loops
 /// independently with a random starting frame for visual variety.
 /// Created when health drops below ConditionYellow, removed when repaired above.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DamageFireOverlays {
     pub fires: Vec<DamageFireAnim>,
 }
 
 /// A single looping fire/smoke animation attached to a damaged building.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DamageFireAnim {
     /// SHP type interned ID (e.g., "FIRE01").
     pub shp_name: InternedId,
@@ -494,7 +496,7 @@ pub struct DamageFireAnim {
 /// Spawned when a garrisoned building fires (one per shot). Positioned at the
 /// building's screen origin + MuzzleFlash pixel offset from art.ini. Auto-removed
 /// when the animation completes (not looping, unlike DamageFireAnim).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GarrisonMuzzleFlash {
     /// Stable ID of the building entity (to look up screen position each frame).
     pub building_id: u64,
@@ -519,7 +521,7 @@ pub struct GarrisonMuzzleFlash {
 /// Used for visual effects not attached to any entity: chrono warp sparkles,
 /// explosions, weapon impacts, ion storm bolts, etc. The render loop draws
 /// these as flat ground-level sprites. They auto-remove when finished.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorldEffect {
     /// SHP type interned ID (uppercase), e.g., "WARPOUT", "WARPIN", "FBALL1".
     pub shp_name: InternedId,

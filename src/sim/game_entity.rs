@@ -40,7 +40,7 @@ use crate::sim::slave_miner::SlaveHarvester;
 ///
 /// Every game object (unit, infantry, building, aircraft) is one `GameEntity`.
 /// Core fields are always present; optional subsystems use `Option<T>`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GameEntity {
     // --- Always present (every entity has these) ---
     /// Deterministic stable ID — primary key, used for cross-entity references,
@@ -183,6 +183,7 @@ pub struct GameEntity {
     pub capture_target: Option<u64>,
     /// Debug event log — records movement/state transitions for the inspector panel.
     /// Only allocated when debug inspector is active (X hotkey). Not included in state hashing.
+    #[serde(skip)]
     pub debug_log: Option<DebugEventLog>,
 }
 

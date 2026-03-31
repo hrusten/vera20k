@@ -15,7 +15,7 @@ use crate::rules::ini_parser::IniFile;
 
 /// Which category of game object this entity represents.
 /// Determines rendering approach and available behaviors.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum EntityCategory {
     /// Vehicles — rendered as VXL voxel models.
     Unit,

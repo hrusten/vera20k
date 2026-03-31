@@ -26,7 +26,7 @@ use crate::util::lepton;
 ///
 /// Tracks which entities are currently inside this transport/garrison.
 /// Passengers are stored as a Vec of stable_ids for deterministic ordering.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PassengerCargo {
     /// Stable IDs of entities currently inside, in boarding order (FIFO unload).
     pub passengers: Vec<u64>,
@@ -103,7 +103,7 @@ impl PassengerCargo {
 }
 
 /// Boarding intent phase — tracks a passenger's approach to a transport.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum BoardingPhase {
     /// Moving toward the transport cell.
     Approach,
@@ -113,7 +113,7 @@ pub enum BoardingPhase {
 
 /// Passenger/transport role for an entity. Replaces three separate Option fields
 /// with a single enum that makes invalid states unrepresentable.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PassengerRole {
     /// Entity has no passenger/transport role. Most entities are this.
     None,

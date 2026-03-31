@@ -10,6 +10,8 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::map::houses::{are_houses_friendly, HouseAllianceMap};
 use crate::sim::entity_store::EntityStore;
 use crate::sim::intern::{InternedId, StringInterner};
@@ -32,7 +34,7 @@ pub const MAX_SIGHT_RANGE: u16 = 10;
 /// Indexed by `ry * width + rx`. Each byte holds FLAG_REVEALED and/or
 /// FLAG_VISIBLE bits. This gives O(1) per-cell lookups instead of O(log n)
 /// with the previous BTreeSet design.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OwnerVisibility {
     cells: Vec<u8>,
     width: u16,
@@ -173,7 +175,7 @@ impl OwnerVisibility {
 /// Stores per-owner visibility grids plus a lazily-computed merged grid for
 /// fast alliance-aware queries. The merged grid is built once via
 /// `build_merged_for()` and then used by `is_cell_visible`, edge masks, etc.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FogState {
     pub width: u16,
     pub height: u16,
@@ -183,6 +185,7 @@ pub struct FogState {
     /// Built once per tick via `build_merged_for()`. All alliance-aware
     /// queries (is_cell_visible, edge masks) use this for O(1) lookups
     /// instead of iterating all owners per cell.
+    #[serde(skip)]
     pub(crate) merged: Option<(InternedId, OwnerVisibility)>,
     /// Monotonically increasing counter bumped whenever visibility changes
     /// (after each `build_merged_for()` call). Used by the fog mask renderer

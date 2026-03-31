@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 ///
 /// Keyed by refinery StableEntityId. Each refinery has at most one occupant
 /// (the miner currently unloading) and a FIFO queue of waiting miners.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DockReservations {
     /// Maps refinery StableEntityId -> currently docked miner StableEntityId.
     pub occupied: BTreeMap<u64, u64>,

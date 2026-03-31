@@ -22,7 +22,7 @@ use crate::rules::object_type::ObjectType;
 use crate::rules::ruleset::GeneralRules;
 
 /// Which kind of resource a map cell or cargo bale contains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ResourceType {
     Ore,
     Gem,
@@ -32,7 +32,7 @@ pub enum ResourceType {
 ///
 /// Replaces the old bare `u16` in `resource_nodes` so the sim knows whether
 /// a cell contains ore or gems (affects bale value and palette).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ResourceNode {
     pub resource_type: ResourceType,
     pub remaining: u16,
@@ -40,7 +40,7 @@ pub struct ResourceNode {
 
 /// Which miner chassis this entity uses.
 /// Determines movement behavior (drive vs chrono-teleport) and cargo capacity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MinerKind {
     /// Soviet War Miner (HARV): drives both ways, armed, large cargo.
     War,
@@ -52,7 +52,7 @@ pub enum MinerKind {
 }
 
 /// State machine for the miner harvest loop.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MinerState {
     /// Looking for the nearest ore/gem cell to harvest.
     SearchOre,
@@ -77,7 +77,7 @@ pub enum MinerState {
 /// Active when `MinerState::Dock` is the current top-level state. Drives the
 /// approach → rotate → enter pad → turn → unload → exit choreography that
 /// the original game's `BuildingClass::DockingSequence_Update` performs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub enum RefineryDockPhase {
     /// Moving toward the queue cell (QueueingCell from art.ini).
     #[default]
@@ -100,7 +100,7 @@ pub enum RefineryDockPhase {
 ///
 /// Each harvest tick pops one bale worth of resource from the map cell and
 /// pushes it into the miner's cargo hold.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CargoBale {
     pub resource_type: ResourceType,
     pub value: u16,
@@ -109,7 +109,7 @@ pub struct CargoBale {
 /// Tunable configuration for the miner/refinery/resource system.
 ///
 /// Ship with RA2-like defaults; override for balance mods.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MinerConfig {
     // -- Bale values --
     /// Credits per ore bale.
@@ -200,7 +200,7 @@ impl MinerConfig {
 ///
 /// Attached to harvester entities alongside Position, Owner, TypeRef, etc.
 /// The miner_system tick reads and mutates this each frame.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Miner {
     pub kind: MinerKind,
     pub state: MinerState,

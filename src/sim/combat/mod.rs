@@ -89,7 +89,7 @@ pub fn armor_index(armor: &str) -> usize {
 /// attacker's weapon at the target each tick. Supports burst firing:
 /// multiple rapid shots per attack cycle, with ROF cooldown only after
 /// the full burst completes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttackTarget {
     /// Stable entity ID of the target being attacked.
     pub target: u64,

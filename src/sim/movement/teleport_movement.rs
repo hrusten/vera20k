@@ -30,7 +30,7 @@ use crate::util::lepton::CELL_CENTER_LEPTON;
 ///
 /// Phase 0 relocates instantly in one tick, then the chrono delay timer
 /// counts down while the unit is semi-transparent at the destination.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TeleportPhase {
     /// Instant relocation: position updated, occupancy swapped. Executes in
     /// one tick, then transitions to ChronoDelay.
@@ -46,7 +46,7 @@ pub enum TeleportPhase {
 /// Set by `issue_teleport_command()` and cleared when the chrono delay
 /// expires. The render system reads `being_warped_ticks` to apply 50%
 /// translucency while the unit materializes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TeleportState {
     /// Current phase in the teleport sequence.
     pub phase: TeleportPhase,

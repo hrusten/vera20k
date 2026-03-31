@@ -41,7 +41,7 @@ const PEAK_ALTITUDE: SimFixed = SimFixed::lit("400");
 const ALTITUDE_VISUAL_SCALE: f32 = 0.06;
 
 /// Phase within the rocket state machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RocketPhase {
     /// Initial vertical boost — rocket rises from launcher.
     Launch,
@@ -60,7 +60,7 @@ pub enum RocketPhase {
 ///
 /// Sim-critical fields use `SimFixed` for deterministic lockstep.
 /// `pitch` is render-only and stays as `f32`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RocketState {
     /// Current phase in the rocket flight.
     pub phase: RocketPhase,

@@ -31,7 +31,7 @@ use crate::util::fixed_math::{sim_from_f32, SimFixed, SIM_ZERO};
 ///
 /// Affects occupancy checks, rendering, and targeting. Ground units block
 /// ground cells; air units occupy the air layer and can fly over obstacles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MovementLayer {
     /// Standard ground surface.
     Ground,
@@ -47,7 +47,7 @@ pub enum MovementLayer {
 ///
 /// 7-state machine matching the original engine's WalkLocomotionClass (+0x50).
 /// States 0-6 govern speed ramping, cell transitions, and obstacle handling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum GroundMovePhase {
     /// State 0: No movement order. Unit is stationary at a valid cell position.
     /// Entry: set when speed reaches 0 and unit completes all movement at cell center.
@@ -81,7 +81,7 @@ pub enum GroundMovePhase {
 /// Used by Fly and Jumpjet locomotors to track altitude state transitions.
 /// Fly units cycle through TakingOff → Cruising → Descending → Landed.
 /// Jumpjet units ascend to hover altitude and stay in Hovering.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AirMovePhase {
     /// On the ground, not yet airborne.
     Landed,
@@ -111,7 +111,7 @@ const HOVER_SPEED_MULTIPLIER: SimFixed = SimFixed::lit("0.65");
 ///
 /// Created from `ObjectType` at spawn time. The movement system reads this
 /// to decide how to process the entity's `MovementTarget` each tick.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LocomotorState {
     /// Which locomotor class this unit uses.
     pub kind: LocomotorKind,
@@ -135,6 +135,7 @@ pub struct LocomotorState {
     pub jumpjet_speed: SimFixed,
     /// Jumpjet wobble amplitude (0.0 if no wobble or non-jumpjet).
     /// KEPT as f32 — render-only visual wobble.
+    #[serde(skip, default)]
     pub jumpjet_wobbles: f32,
     /// Jumpjet acceleration rate (JumpjetAccel). Deceleration = accel * 1.5.
     pub jumpjet_accel: SimFixed,
@@ -173,6 +174,7 @@ pub struct LocomotorState {
     /// to facing direction during walking, creating natural visual sway/spacing.
     /// Original engine: WalkLocomotionClass +0x88 `LateralWobble` (double).
     /// Render-only (f32) — does not affect simulation determinism.
+    #[serde(skip, default)]
     pub infantry_wobble_phase: f32,
     /// Within-cell walk destination for infantry. Set when a sub-cell is allocated
     /// during cell entry. The locomotor walks the infantry toward this point after
@@ -364,7 +366,7 @@ impl LocomotorState {
 ///
 /// Used by the piggyback mechanism — some locomotors (Teleport, DropPod) act
 /// as temporary overlays on a unit's base locomotor and restore it when done.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum OverrideKind {
     /// Chrono teleport override — restores base locomotor after warp-in.
     Teleport,
@@ -373,7 +375,7 @@ pub enum OverrideKind {
 }
 
 /// Saved base locomotor state for temporary override restoration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OverrideLocomotor {
     /// The saved base locomotor state to restore when the override ends.
     pub saved: Box<LocomotorState>,

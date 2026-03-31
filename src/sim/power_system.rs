@@ -19,7 +19,7 @@ use crate::sim::game_entity::GameEntity;
 use crate::sim::intern::InternedId;
 
 /// Per-player power state, updated each simulation tick.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PowerState {
     /// Sum of health-scaled positive `Power=` values for all owned buildings.
     pub total_output: i32,

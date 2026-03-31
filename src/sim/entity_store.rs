@@ -109,6 +109,19 @@ impl EntityStore {
     }
 }
 
+impl serde::Serialize for EntityStore {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.entities.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for EntityStore {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let entities = BTreeMap::<u64, GameEntity>::deserialize(deserializer)?;
+        Ok(Self { entities })
+    }
+}
+
 impl Default for EntityStore {
     fn default() -> Self {
         Self::new()

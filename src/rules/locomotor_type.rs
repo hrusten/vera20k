@@ -23,7 +23,7 @@ use crate::rules::object_type::ObjectCategory;
 /// Each variant is a distinct movement controller / state machine in the
 /// original engine. Do NOT collapse these into one generic "ground mover" —
 /// they have meaningfully different behavior (see locomotor report).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum LocomotorKind {
     /// Standard ground vehicle movement. Baseline for all ground movers.
     Drive,
@@ -118,7 +118,7 @@ impl LocomotorKind {
 ///
 /// Parsed from rules.ini `SpeedType=` key. Controls terrain legality in the
 /// pathfinder — a cell is only enterable if the SpeedType allows it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SpeedType {
     /// Infantry default. Can traverse most land terrain.
     Foot,
@@ -217,7 +217,7 @@ impl SpeedType {
 ///
 /// Example: `MovementZone=Subterranean` enables dig-in/dig-out cell search
 /// logic that plain Drive does not have.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum MovementZone {
     /// Standard ground pathfinding. Passability row 0: ground only.

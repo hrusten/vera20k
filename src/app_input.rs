@@ -14,7 +14,7 @@ use crate::app::AppState;
 use crate::app_commands::{
     cancel_build_by_type, cancel_last_build, cycle_active_producer, cycle_local_owner,
     place_ready_building_at_cursor, place_starter_base_for_local_owner, preferred_local_owner,
-    preferred_local_owner_name, queue_build_by_type, queue_default_build, schedule_command,
+    preferred_local_owner_name, queue_build_by_type, schedule_command,
     spawn_test_units_for_local_owner, toggle_pause_build_queue,
 };
 use crate::app_context_order::try_queue_context_order_at_screen_point;
@@ -299,7 +299,9 @@ pub(crate) fn handle_hotkey_pressed(state: &mut AppState, code: winit::keyboard:
                 log::info!("Game paused");
             }
         }
-        KeyCode::KeyB => queue_default_build(state),
+        KeyCode::KeyB => {
+            state.queued_order_mode = OrderMode::Move;
+        }
         KeyCode::KeyS => queue_stop_for_selected(state),
         KeyCode::KeyD => queue_deploy_undeploy_for_selected(state),
         KeyCode::KeyA => {
@@ -311,7 +313,10 @@ pub(crate) fn handle_hotkey_pressed(state: &mut AppState, code: winit::keyboard:
             log::info!("Order mode armed: Guard");
         }
         KeyCode::KeyM => {
-            state.queued_order_mode = OrderMode::Move;
+            quicksave(state);
+        }
+        KeyCode::KeyN => {
+            quickload(state);
         }
         KeyCode::KeyQ => apply_sidebar_action(state, SidebarAction::SelectTab(SidebarTab::Building)),
         KeyCode::KeyW => apply_sidebar_action(state, SidebarAction::SelectTab(SidebarTab::Defense)),
@@ -332,6 +337,12 @@ pub(crate) fn handle_hotkey_pressed(state: &mut AppState, code: winit::keyboard:
         }
         KeyCode::F1 => {
             state.show_hotkey_help = !state.show_hotkey_help;
+        }
+        KeyCode::F5 => {
+            state.show_save_load_panel = !state.show_save_load_panel;
+            if state.show_save_load_panel {
+                state.save_list_cache.invalidate();
+            }
         }
         KeyCode::KeyH => {
             jump_camera_to_base(state);
@@ -439,6 +450,131 @@ pub(crate) fn handle_hotkey_pressed(state: &mut AppState, code: winit::keyboard:
         }
         _ => {}
     }
+}
+
+// ---------------------------------------------------------------------------
+// Quick-save / quick-load
+// ---------------------------------------------------------------------------
+
+const SAVES_DIR: &str = "saves";
+
+fn quicksave(state: &mut AppState) {
+    let Some(sim) = &state.simulation else {
+        log::warn!("Quicksave: no active simulation");
+        return;
+    };
+    let rules_h = state
+        .rules
+        .as_ref()
+        .map(crate::app_sim_tick::rules_hash)
+        .unwrap_or(0);
+    let map_name = &state.theater_name;
+    let bytes = crate::sim::snapshot::GameSnapshot::save(sim, 0, rules_h, map_name);
+    if let Err(e) = std::fs::create_dir_all(SAVES_DIR) {
+        log::error!("Quicksave: failed to create saves dir: {e}");
+        return;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let filename = format!("save_tick{}_{}.bin", sim.tick, now);
+    let path = format!("{SAVES_DIR}/{filename}");
+    match std::fs::write(&path, &bytes) {
+        Ok(()) => {
+            log::info!("Quicksave: saved {} bytes to {}", bytes.len(), path);
+            state.save_list_cache.invalidate();
+        }
+        Err(e) => log::error!("Quicksave: write failed: {e}"),
+    }
+}
+
+/// Find the most recent `.bin` save file in the saves directory.
+fn most_recent_save_path() -> Option<std::path::PathBuf> {
+    let dir = std::fs::read_dir(SAVES_DIR).ok()?;
+    dir.filter_map(|entry| {
+        let entry = entry.ok()?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("bin") {
+            let meta = entry.metadata().ok()?;
+            Some((path, meta.modified().ok()?))
+        } else {
+            None
+        }
+    })
+    .max_by_key(|(_, modified)| *modified)
+    .map(|(path, _)| path)
+}
+
+fn quickload(state: &mut AppState) {
+    let path = match most_recent_save_path() {
+        Some(p) => p,
+        None => {
+            log::warn!("Quickload: no save files found in {SAVES_DIR}/");
+            return;
+        }
+    };
+    load_save_file(state, &path);
+}
+
+/// Load a save file by path. Used by both quickload and the save/load panel.
+pub(crate) fn load_save_file(state: &mut AppState, path: &std::path::Path) {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            log::warn!("Load: could not read {}: {e}", path.display());
+            return;
+        }
+    };
+    let snapshot = match crate::sim::snapshot::GameSnapshot::load(&bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Load: {e}");
+            return;
+        }
+    };
+
+    // Grab cache data from the current sim (these fields are #[serde(skip)]
+    // and must be restored after deserialization).
+    let Some(current_sim) = &state.simulation else {
+        log::warn!("Load: no active simulation to restore caches from");
+        return;
+    };
+    let terrain_speed_config = current_sim.terrain_speed_config.clone();
+    let bridge_explosions = current_sim.bridge_explosions.clone();
+    let effect_frame_counts = current_sim.effect_frame_counts.clone();
+    let terrain_costs = current_sim.terrain_costs.clone();
+
+    let resolved_terrain = match state.resolved_terrain.clone() {
+        Some(rt) => rt,
+        None => {
+            log::error!("Load: no resolved_terrain available");
+            return;
+        }
+    };
+
+    // Replace the simulation with the loaded one.
+    let mut sim = snapshot.sim;
+    sim.rebuild_caches_after_load(
+        resolved_terrain,
+        terrain_speed_config,
+        bridge_explosions,
+        effect_frame_counts,
+        terrain_costs,
+    );
+    state.simulation = Some(sim);
+
+    // Rebuild the app-layer dynamic path grid (building footprints + walls).
+    crate::app_sim_tick::rebuild_dynamic_path_grid(state);
+
+    // Reset timing to prevent a burst of ticks after the load.
+    state.last_update_time = std::time::Instant::now();
+    state.sim_accumulator_ms = 0;
+
+    // Close the save/load panel after loading.
+    state.show_save_load_panel = false;
+
+    log::info!("Load: restored simulation from {}", path.display());
 }
 
 pub(crate) fn is_shift_held(state: &AppState) -> bool {
