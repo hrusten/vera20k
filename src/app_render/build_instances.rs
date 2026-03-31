@@ -198,10 +198,10 @@ pub(super) fn build_world_instances(state: &mut AppState, sw: f32, sh: f32) -> W
     // Garrison muzzle flashes (OccupantAnim) at fire port positions.
     app_instances::build_garrison_muzzle_flash_instances(state, &mut shp_paged);
     for page in &mut shp_paged {
-        sort_by_y_asc(page);
+        sort_by_depth_desc(page);
     }
     for page in &mut bridge_shp_paged {
-        sort_by_y_asc(page);
+        sort_by_depth_desc(page);
     }
 
     // One-time first-frame statistics.
@@ -275,6 +275,7 @@ pub(super) fn update_minimap(state: &mut AppState, local_owner: &Option<String>)
             &state.batch_renderer,
             &sim.entities,
             &state.house_color_map,
+            sim.tick,
             if state.sandbox_full_visibility {
                 None
             } else {
@@ -294,9 +295,7 @@ pub(super) fn update_minimap(state: &mut AppState, local_owner: &Option<String>)
 pub(super) fn build_ui_instances(state: &AppState, sw: f32, sh: f32) -> UiInstances {
     let bracket: Vec<SpriteInstance> =
         crate::app_selection_brackets::build_selection_bracket_instances(state, sw, sh);
-    let mut building_status: Vec<SpriteInstance> = build_building_status_instances(state, sw, sh);
-    // DEBUG: append bracket instances into building_status pool to test rendering.
-    building_status.extend_from_slice(&bracket);
+    let building_status: Vec<SpriteInstance> = build_building_status_instances(state, sw, sh);
     let occupant_pip = build_occupant_pip_instances(state, sw, sh);
     let unit_status_bg = build_unit_status_bg_instances(state, sw, sh);
     let unit_status_fill = build_unit_status_fill_instances(state, sw, sh);
@@ -607,15 +606,6 @@ fn sort_by_depth_desc(instances: &mut [SpriteInstance]) {
     instances.sort_by(|a, b| {
         b.depth
             .partial_cmp(&a.depth)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-}
-
-/// Sort instances by Y position ascending (used for SHP pages where Y = screen row).
-fn sort_by_y_asc(instances: &mut [SpriteInstance]) {
-    instances.sort_by(|a, b| {
-        a.position[1]
-            .partial_cmp(&b.position[1])
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 }
