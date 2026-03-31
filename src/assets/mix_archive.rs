@@ -39,6 +39,7 @@
 //! - Part of assets/ — no dependencies on game modules.
 //! - Uses mix_crypto for decryption and mix_hash for filename lookup.
 
+use std::fs::File;
 use std::path::Path;
 
 use crate::assets::error::AssetError;
@@ -78,12 +79,6 @@ pub struct MixEntry {
 ///
 /// Holds the entire MIX file data in memory and provides
 /// methods to look up and extract files by name or hash ID.
-///
-/// ## Why keep everything in memory?
-/// RA2's MIX files are typically 100-300 MB total. Modern systems
-/// have plenty of RAM, and keeping the data in memory avoids repeated
-/// disk I/O when extracting multiple files. Memory-mapping could be
-/// added as an optimization later if needed.
 pub struct MixArchive {
     /// The file index entries, sorted by id for binary search lookup.
     entries: Vec<MixEntry>,
@@ -91,14 +86,33 @@ pub struct MixArchive {
     hash_kind: MixHashKind,
     /// Byte offset where the body section starts in the raw data.
     body_offset: usize,
-    /// The raw file data (entire MIX file kept in memory).
-    data: Vec<u8>,
+    /// The raw archive bytes. Disk archives can stay memory-mapped; nested
+    /// archives copied out of parent MIXes stay owned.
+    data: MixData,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MixHashKind {
     Crc32,
     Westwood,
+}
+
+enum MixData {
+    Owned(Vec<u8>),
+    Mapped(memmap2::Mmap),
+}
+
+impl MixData {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Owned(data) => data,
+            Self::Mapped(map) => map,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
 }
 
 impl MixArchive {
@@ -108,37 +122,95 @@ impl MixArchive {
     /// - 0x0000 → new format (RA2/TS): real flags at offset 2
     /// - Non-zero → old format (TD/RA1): that value IS the file_count
     pub fn from_bytes(data: Vec<u8>) -> Result<Self, AssetError> {
-        if data.len() < 4 {
+        Self::from_data(MixData::Owned(data))
+    }
+
+    /// Cheap format sniff used before cloning candidate nested MIX payloads.
+    pub fn looks_like_mix(data: &[u8]) -> bool {
+        if data.len() < INDEX_HEADER_SIZE {
+            return false;
+        }
+
+        let first_word: u16 = read_u16_le(data, 0);
+
+        if first_word == 0 {
+            if data.len() < NEW_FORMAT_HEADER_SIZE + INDEX_HEADER_SIZE {
+                return false;
+            }
+
+            let flags: u16 = read_u16_le(data, 2);
+            if (flags & FLAG_ENCRYPTED) != 0 {
+                let min_header = NEW_FORMAT_HEADER_SIZE
+                    + mix_crypto::RSA_KEY_BLOCK_SIZE
+                    + mix_crypto::BLOWFISH_BLOCK_SIZE;
+                return data.len() >= min_header;
+            }
+
+            let file_count: u16 = read_u16_le(data, NEW_FORMAT_HEADER_SIZE);
+            let body_size: u32 = read_u32_le(data, NEW_FORMAT_HEADER_SIZE + 2);
+            let Some(index_bytes) = (file_count as usize).checked_mul(INDEX_ENTRY_SIZE) else {
+                return false;
+            };
+            let Some(body_offset) =
+                (NEW_FORMAT_HEADER_SIZE + INDEX_HEADER_SIZE).checked_add(index_bytes)
+            else {
+                return false;
+            };
+            return Self::header_bounds_are_sane(data, body_offset, body_size);
+        }
+
+        let file_count: u16 = first_word;
+        let body_size: u32 = read_u32_le(data, 2);
+        let Some(index_bytes) = (file_count as usize).checked_mul(INDEX_ENTRY_SIZE) else {
+            return false;
+        };
+        let Some(body_offset) = INDEX_HEADER_SIZE.checked_add(index_bytes) else {
+            return false;
+        };
+        Self::header_bounds_are_sane(data, body_offset, body_size)
+    }
+
+    fn from_data(data: MixData) -> Result<Self, AssetError> {
+        let bytes = data.as_slice();
+        if bytes.len() < 4 {
             return Err(AssetError::InvalidMixHeader {
-                reason: format!("File too small: {} bytes (need at least 4)", data.len()),
+                reason: format!("File too small: {} bytes (need at least 4)", bytes.len()),
             });
         }
 
         // The first u16 distinguishes old vs new MIX format.
         // New format (RA2/TS): offset 0 is always 0x0000 as a format marker.
         // Old format (TD/RA1): offset 0 is file_count (always non-zero).
-        let first_word: u16 = read_u16_le(&data, 0);
-
-        if first_word == 0 {
+        let first_word: u16 = read_u16_le(bytes, 0);
+        let (mut entries, hash_kind, body_offset) = if first_word == 0 {
             // New format: actual flags are at offset 2.
-            let flags: u16 = read_u16_le(&data, 2);
+            let flags: u16 = read_u16_le(bytes, 2);
             let is_encrypted: bool = (flags & FLAG_ENCRYPTED) != 0;
 
             if is_encrypted {
-                Self::parse_encrypted_new_format(data)
+                Self::parse_encrypted_new_format(bytes)?
             } else {
-                Self::parse_unencrypted_new_format(data)
+                Self::parse_unencrypted_new_format(bytes)?
             }
         } else {
             // Old format: first_word IS the file_count. No flags, no encryption.
-            Self::parse_old_format(data, first_word)
-        }
+            Self::parse_old_format(bytes, first_word)?
+        };
+        entries.sort_by_key(|e| e.id);
+
+        Ok(Self {
+            entries,
+            hash_kind,
+            body_offset,
+            data,
+        })
     }
 
     /// Load a MIX archive from a file path.
     pub fn load(path: &Path) -> Result<Self, AssetError> {
-        let data: Vec<u8> = std::fs::read(path)?;
-        Self::from_bytes(data)
+        let file = File::open(path)?;
+        let data = unsafe { memmap2::MmapOptions::new().map(&file)? };
+        Self::from_data(MixData::Mapped(data))
     }
 
     /// Look up a file by name. Returns the raw bytes if found.
@@ -169,16 +241,17 @@ impl MixArchive {
     pub fn get_by_id(&self, id: i32) -> Option<&[u8]> {
         let index: usize = self.entries.binary_search_by_key(&id, |e| e.id).ok()?;
         let entry: &MixEntry = &self.entries[index];
+        let data = self.data.as_slice();
 
         let start: usize = self.body_offset + entry.offset as usize;
         let end: usize = start + entry.size as usize;
 
         // Bounds check to prevent panics on corrupt data.
-        if end > self.data.len() {
+        if end > data.len() {
             return None;
         }
 
-        Some(&self.data[start..end])
+        Some(&data[start..end])
     }
 
     /// Number of files in this archive.
@@ -200,7 +273,9 @@ impl MixArchive {
     ///
     /// Layout: [marker:2][flags:2][RSA block:80][encrypted index...][body...]
     /// The RSA block starts at offset 4 (after the 2-byte marker + 2-byte flags).
-    fn parse_encrypted_new_format(data: Vec<u8>) -> Result<Self, AssetError> {
+    fn parse_encrypted_new_format(
+        data: &[u8],
+    ) -> Result<(Vec<MixEntry>, MixHashKind, usize), AssetError> {
         // RSA key block starts after the 4-byte new-format header.
         let rsa_start: usize = NEW_FORMAT_HEADER_SIZE;
         let rsa_end: usize = rsa_start + mix_crypto::RSA_KEY_BLOCK_SIZE;
@@ -265,22 +340,16 @@ impl MixArchive {
         // Body data starts right after the encrypted index.
         let body_offset: usize = encrypted_start + encrypted_size;
 
-        let mut archive: Self = Self {
-            entries,
-            hash_kind: MixHashKind::Crc32,
-            body_offset,
-            data,
-        };
-        archive.entries.sort_by_key(|e| e.id);
-
-        Ok(archive)
+        Ok((entries, MixHashKind::Crc32, body_offset))
     }
 
     /// Parse a new-format unencrypted MIX file (flags has no encryption bit).
     ///
     /// Layout: [marker:2][flags:2][file_count:2][body_size:4][entries...][body...]
     /// The index header starts at offset 4.
-    fn parse_unencrypted_new_format(data: Vec<u8>) -> Result<Self, AssetError> {
+    fn parse_unencrypted_new_format(
+        data: &[u8],
+    ) -> Result<(Vec<MixEntry>, MixHashKind, usize), AssetError> {
         if data.len() < NEW_FORMAT_HEADER_SIZE + INDEX_HEADER_SIZE {
             return Err(AssetError::InvalidMixHeader {
                 reason: "File too small for new-format unencrypted header".to_string(),
@@ -305,22 +374,17 @@ impl MixArchive {
         let entries: Vec<MixEntry> = Self::parse_entries(&data, index_start, file_count)?;
         let body_offset: usize = index_end;
 
-        let mut archive: Self = Self {
-            entries,
-            hash_kind: MixHashKind::Crc32,
-            body_offset,
-            data,
-        };
-        archive.entries.sort_by_key(|e| e.id);
-
-        Ok(archive)
+        Ok((entries, MixHashKind::Crc32, body_offset))
     }
 
     /// Parse an old-format MIX file (TD/RA1/theme.mix — no format marker).
     ///
     /// Layout: [file_count:2][body_size:4][entries...][body...]
     /// The first u16 at offset 0 is already the file_count (passed in).
-    fn parse_old_format(data: Vec<u8>, file_count: u16) -> Result<Self, AssetError> {
+    fn parse_old_format(
+        data: &[u8],
+        file_count: u16,
+    ) -> Result<(Vec<MixEntry>, MixHashKind, usize), AssetError> {
         if data.len() < INDEX_HEADER_SIZE {
             return Err(AssetError::InvalidMixHeader {
                 reason: "File too small for old-format header".to_string(),
@@ -345,15 +409,7 @@ impl MixArchive {
         let entries: Vec<MixEntry> = Self::parse_entries(&data, index_start, file_count)?;
         let body_offset: usize = index_end;
 
-        let mut archive: Self = Self {
-            entries,
-            hash_kind: MixHashKind::Westwood,
-            body_offset,
-            data,
-        };
-        archive.entries.sort_by_key(|e| e.id);
-
-        Ok(archive)
+        Ok((entries, MixHashKind::Westwood, body_offset))
     }
 
     /// Parse file index entries from a buffer starting at the given offset.
@@ -386,6 +442,13 @@ impl MixArchive {
         }
 
         Ok(entries)
+    }
+
+    fn header_bounds_are_sane(data: &[u8], body_offset: usize, body_size: u32) -> bool {
+        if body_offset > data.len() {
+            return false;
+        }
+        body_size as usize <= data.len().saturating_sub(body_offset)
     }
 }
 
@@ -495,6 +558,17 @@ mod tests {
         let archive: MixArchive = MixArchive::from_bytes(data).expect("Should parse");
 
         assert!(archive.get_by_name("nonexistent.dat").is_none());
+    }
+
+    #[test]
+    fn test_looks_like_mix_accepts_valid_headers() {
+        assert!(MixArchive::looks_like_mix(&make_test_mix_new_format()));
+        assert!(MixArchive::looks_like_mix(&make_test_mix_old_format()));
+    }
+
+    #[test]
+    fn test_looks_like_mix_rejects_non_mix_data() {
+        assert!(!MixArchive::looks_like_mix(b"not a mix archive"));
     }
 
     #[test]

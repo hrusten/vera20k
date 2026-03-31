@@ -55,6 +55,7 @@ toml = "0.8"
 # nom parses RA2's binary asset formats (.mix, .shp, .vxl, .pal, .tmp, .hva).
 # All parsers are written from scratch — no third-party RA2-specific crates.
 nom = "7"
+memmap2 = "0.9"
 
 # --- Error handling ---
 # thiserror for structured library errors (AssetError, RulesError, etc.)
