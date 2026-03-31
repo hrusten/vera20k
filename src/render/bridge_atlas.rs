@@ -135,8 +135,8 @@ fn render_bridge_sprite(
     }
 
     let shp: ShpFile = candidates.iter().find_map(|name| {
-        let data = asset_manager.get(name)?;
-        let shp = ShpFile::from_bytes(&data).ok()?;
+        let data = asset_manager.get_ref(name)?;
+        let shp = ShpFile::from_bytes(data).ok()?;
         let has_drawable = shp
             .frames
             .iter()

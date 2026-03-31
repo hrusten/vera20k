@@ -570,7 +570,7 @@ pub fn load_tile_images(
             }
         };
 
-        let tmp_data: Vec<u8> = match asset_manager.get(filename) {
+        let tmp_data: &[u8] = match asset_manager.get_ref(filename) {
             Some(d) => d,
             None => {
                 missing_file_count += sub_tiles.len() as u32;
@@ -579,7 +579,7 @@ pub fn load_tile_images(
             }
         };
 
-        let tmp: TmpFile = match TmpFile::from_bytes(&tmp_data) {
+        let tmp: TmpFile = match TmpFile::from_bytes(tmp_data) {
             Ok(t) => t,
             Err(e) => {
                 parse_error_count += sub_tiles.len() as u32;
@@ -646,10 +646,10 @@ pub fn load_tile_images(
             continue;
         }
         for (var_idx, var_name) in var_names.iter().enumerate() {
-            let Some(var_data) = asset_manager.get(var_name) else {
+            let Some(var_data) = asset_manager.get_ref(var_name) else {
                 break; // Stop at first missing variant (same as FA2)
             };
-            let Ok(var_tmp) = TmpFile::from_bytes(&var_data) else {
+            let Ok(var_tmp) = TmpFile::from_bytes(var_data) else {
                 break;
             };
             let var_cell_count = (var_tmp.template_width * var_tmp.template_height) as usize;

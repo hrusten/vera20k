@@ -211,8 +211,8 @@ impl AssetManager {
                 continue;
             }
 
-            match MixArchive::from_bytes(data.to_vec()) {
-                Ok(nested) if nested.entry_count() > 0 => {
+            match parent.nested_archive_by_id(entry.id) {
+                Ok(Some(nested)) if nested.entry_count() > 0 => {
                     let nested_name = guess_nested_mix_name(entry.id)
                         .map(|name| format!("{parent_name} -> {name}"))
                         .unwrap_or_else(|| {
@@ -229,8 +229,11 @@ impl AssetManager {
                         archive: nested,
                     });
                 }
-                _ => {
+                Ok(_) => {
                     // Not a MIX archive or empty.
+                }
+                Err(_) => {
+                    // Not a MIX archive or malformed.
                 }
             }
         }
@@ -295,11 +298,19 @@ impl AssetManager {
 
     /// Load an additional nested archive from within already-loaded archives.
     pub fn load_nested(&mut self, name: &str) -> Result<(), AssetError> {
-        let data = self.get(name).ok_or_else(|| AssetError::AssetNotFound {
-            name: name.to_string(),
-        })?;
-
-        let archive = MixArchive::from_bytes(data)?;
+        let archive = {
+            let (named, entry_id) =
+                self.lookup_asset_entry(name)
+                    .ok_or_else(|| AssetError::AssetNotFound {
+                        name: name.to_string(),
+                    })?;
+            named
+                .archive
+                .nested_archive_by_id(entry_id)?
+                .ok_or_else(|| AssetError::AssetNotFound {
+                    name: name.to_string(),
+                })?
+        };
         log::info!(
             "Loaded nested archive: {} ({} entries)",
             name,

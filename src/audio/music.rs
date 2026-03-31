@@ -223,17 +223,17 @@ impl MusicPlayer {
 /// Returns (samples, sample_rate) or None if not found / decode fails.
 fn load_track(track_name: &str, assets: &AssetManager) -> Option<(Vec<f32>, u32)> {
     for filename in [format!("{}.wav", track_name), format!("{}.aud", track_name)] {
-        let Some(data) = assets.get(&filename) else {
+        let Some(data) = assets.get_ref(&filename) else {
             continue;
         };
 
         if data.len() >= 44 && &data[0..4] == b"RIFF" {
-            if let Some(decoded) = decode_wav(&data, &filename) {
+            if let Some(decoded) = decode_wav(data, &filename) {
                 return Some((decoded.samples, decoded.sample_rate));
             }
         }
 
-        let (header, samples) = match aud_file::decode_aud(&data) {
+        let (header, samples) = match aud_file::decode_aud(data) {
             Some(decoded) => decoded,
             None => continue,
         };
@@ -272,8 +272,8 @@ fn load_track(track_name: &str, assets: &AssetManager) -> Option<(Vec<f32>, u32)
 }
 
 fn load_theme_ini(assets: &AssetManager, name: &str) -> Option<IniFile> {
-    let bytes = assets.get(name)?;
-    IniFile::from_bytes(&bytes).ok()
+    let bytes = assets.get_ref(name)?;
+    IniFile::from_bytes(bytes).ok()
 }
 
 fn merge_theme_aliases(into: &mut HashMap<String, String>, ini: &IniFile) {

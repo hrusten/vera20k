@@ -41,6 +41,7 @@
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::assets::error::AssetError;
 use crate::assets::mix_crypto;
@@ -86,8 +87,8 @@ pub struct MixArchive {
     hash_kind: MixHashKind,
     /// Byte offset where the body section starts in the raw data.
     body_offset: usize,
-    /// The raw archive bytes. Disk archives can stay memory-mapped; nested
-    /// archives copied out of parent MIXes stay owned.
+    /// The raw archive bytes. Top-level archives can stay memory-mapped;
+    /// nested archives can share a sub-view into parent archive storage.
     data: MixData,
 }
 
@@ -97,21 +98,61 @@ enum MixHashKind {
     Westwood,
 }
 
-enum MixData {
-    Owned(Vec<u8>),
-    Mapped(memmap2::Mmap),
+#[derive(Clone)]
+enum MixBytes {
+    Owned(Arc<[u8]>),
+    Mapped(Arc<memmap2::Mmap>),
+}
+
+#[derive(Clone)]
+struct MixData {
+    bytes: MixBytes,
+    start: usize,
+    len: usize,
 }
 
 impl MixData {
-    fn as_slice(&self) -> &[u8] {
-        match self {
-            Self::Owned(data) => data,
-            Self::Mapped(map) => map,
+    fn from_owned(data: Vec<u8>) -> Self {
+        let bytes: Arc<[u8]> = data.into();
+        let len = bytes.len();
+        Self {
+            bytes: MixBytes::Owned(bytes),
+            start: 0,
+            len,
         }
     }
 
+    fn from_mapped(map: memmap2::Mmap) -> Self {
+        let bytes = Arc::new(map);
+        let len = bytes.len();
+        Self {
+            bytes: MixBytes::Mapped(bytes),
+            start: 0,
+            len,
+        }
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        let bytes = match &self.bytes {
+            MixBytes::Owned(data) => &data[..],
+            MixBytes::Mapped(map) => &map[..],
+        };
+        &bytes[self.start..self.start + self.len]
+    }
+
+    fn subrange(&self, start: usize, end: usize) -> Option<Self> {
+        if start > end || end > self.len {
+            return None;
+        }
+        Some(Self {
+            bytes: self.bytes.clone(),
+            start: self.start + start,
+            len: end - start,
+        })
+    }
+
     fn len(&self) -> usize {
-        self.as_slice().len()
+        self.len
     }
 }
 
@@ -122,7 +163,7 @@ impl MixArchive {
     /// - 0x0000 → new format (RA2/TS): real flags at offset 2
     /// - Non-zero → old format (TD/RA1): that value IS the file_count
     pub fn from_bytes(data: Vec<u8>) -> Result<Self, AssetError> {
-        Self::from_data(MixData::Owned(data))
+        Self::from_data(MixData::from_owned(data))
     }
 
     /// Cheap format sniff used before cloning candidate nested MIX payloads.
@@ -210,7 +251,7 @@ impl MixArchive {
     pub fn load(path: &Path) -> Result<Self, AssetError> {
         let file = File::open(path)?;
         let data = unsafe { memmap2::MmapOptions::new().map(&file)? };
-        Self::from_data(MixData::Mapped(data))
+        Self::from_data(MixData::from_mapped(data))
     }
 
     /// Look up a file by name. Returns the raw bytes if found.
@@ -252,6 +293,18 @@ impl MixArchive {
         }
 
         Some(&data[start..end])
+    }
+
+    /// Parse a child MIX archive directly from an entry without copying its bytes.
+    pub fn nested_archive_by_id(&self, id: i32) -> Result<Option<Self>, AssetError> {
+        let index: usize = match self.entries.binary_search_by_key(&id, |e| e.id) {
+            Ok(index) => index,
+            Err(_) => return Ok(None),
+        };
+        let Some(data) = self.entry_view(&self.entries[index]) else {
+            return Ok(None);
+        };
+        Self::from_data(data).map(Some)
     }
 
     /// Number of files in this archive.
@@ -450,6 +503,15 @@ impl MixArchive {
         }
         body_size as usize <= data.len().saturating_sub(body_offset)
     }
+
+    fn entry_view(&self, entry: &MixEntry) -> Option<MixData> {
+        let start: usize = self.body_offset + entry.offset as usize;
+        let end: usize = start + entry.size as usize;
+        if end > self.data.len() {
+            return None;
+        }
+        self.data.subrange(start, end)
+    }
 }
 
 #[cfg(test)]
@@ -501,6 +563,22 @@ mod tests {
 
         // Body data
         data.extend_from_slice(b"world");
+
+        data
+    }
+
+    fn make_test_mix_with_entry(name: &str, body: &[u8]) -> Vec<u8> {
+        let mut data: Vec<u8> = Vec::new();
+        let entry_id: i32 = mix_hash(name);
+
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        data.extend_from_slice(&entry_id.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        data.extend_from_slice(body);
 
         data
     }
@@ -569,6 +647,26 @@ mod tests {
     #[test]
     fn test_looks_like_mix_rejects_non_mix_data() {
         assert!(!MixArchive::looks_like_mix(b"not a mix archive"));
+    }
+
+    #[test]
+    fn test_nested_archive_by_id_parses_child_without_copying_interface() {
+        let child = make_test_mix_with_entry("child.txt", b"nested");
+        let parent = MixArchive::from_bytes(make_test_mix_with_entry("child.mix", &child))
+            .expect("parent mix should parse");
+        let child_id = mix_hash("child.mix");
+
+        let nested = parent
+            .nested_archive_by_id(child_id)
+            .expect("nested parse should succeed")
+            .expect("child entry should exist");
+
+        assert_eq!(
+            nested
+                .get_by_name("child.txt")
+                .expect("child asset should exist"),
+            b"nested"
+        );
     }
 
     #[test]

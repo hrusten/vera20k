@@ -183,8 +183,7 @@ pub fn collect_needed_unit_keys(
         }
         let owner_str = interner.map_or("", |i| i.resolve(entity.owner));
         let type_str = interner.map_or("", |i| i.resolve(entity.type_ref));
-        let color_idx: HouseColorIndex =
-            house_colors.get(owner_str).copied().unwrap_or_default();
+        let color_idx: HouseColorIndex = house_colors.get(owner_str).copied().unwrap_or_default();
         // Ground vehicles can drive onto any ramp, so pre-render all 9 slope
         // variants (0=flat, 1-8=ramps) upfront. Aircraft never tilt on slopes.
         let is_ground_vehicle: bool = entity.category != EntityCategory::Aircraft;
@@ -200,8 +199,7 @@ pub fn collect_needed_unit_keys(
         for &layer in layers {
             let fc_key: (String, VxlLayer) = (type_str.to_string(), layer);
             if !frame_counts.contains_key(&fc_key) {
-                let fc: u32 =
-                    detect_hva_frame_count(asset_manager, type_str, layer, rules, art);
+                let fc: u32 = detect_hva_frame_count(asset_manager, type_str, layer, rules, art);
                 frame_counts.insert(fc_key.clone(), fc);
             }
             let num_frames: u32 = frame_counts[&fc_key];
@@ -209,11 +207,8 @@ pub fn collect_needed_unit_keys(
             // Ground vehicles: generate all 9 slope variants (0-8) so no
             // atlas rebuild is needed when driving onto ramps.
             // Aircraft: only slope_type=0 (flat).
-            let slope_range: std::ops::RangeInclusive<u8> = if is_ground_vehicle {
-                0..=8
-            } else {
-                0..=0
-            };
+            let slope_range: std::ops::RangeInclusive<u8> =
+                if is_ground_vehicle { 0..=8 } else { 0..=0 };
             for bucket in 0..buckets {
                 let facing: u8 = bucket.saturating_mul(step);
                 for frame in 0..num_frames {
@@ -252,8 +247,7 @@ pub fn collect_needed_unit_keys(
                 Some(id) => id,
                 None => continue,
             };
-            let hc: HouseColorIndex =
-                house_colors.get(bowner_str).copied().unwrap_or_default();
+            let hc: HouseColorIndex = house_colors.get(bowner_str).copied().unwrap_or_default();
             for bucket in 0..TURRET_FACING_BUCKETS {
                 let facing: u8 = bucket.saturating_mul(TURRET_FACING_STEP);
                 needed.insert(UnitSpriteKey {
@@ -309,8 +303,7 @@ pub fn build_unit_atlas(
         }
         let owner_str = interner.map_or("", |i| i.resolve(entity.owner));
         let type_str = interner.map_or("", |i| i.resolve(entity.type_ref));
-        let color_idx: HouseColorIndex =
-            house_colors.get(owner_str).copied().unwrap_or_default();
+        let color_idx: HouseColorIndex = house_colors.get(owner_str).copied().unwrap_or_default();
         let is_ground_vehicle: bool = entity.category != EntityCategory::Aircraft;
         let has_turret: bool = rules
             .and_then(|r| r.object(type_str))
@@ -324,8 +317,7 @@ pub fn build_unit_atlas(
         for &layer in layers {
             let fc_key: (String, VxlLayer) = (type_str.to_string(), layer);
             if !frame_counts.contains_key(&fc_key) {
-                let fc: u32 =
-                    detect_hva_frame_count(asset_manager, type_str, layer, rules, art);
+                let fc: u32 = detect_hva_frame_count(asset_manager, type_str, layer, rules, art);
                 if fc > 1 {
                     log::info!(
                         "VXL {}/{:?} has {} HVA frames — rendering all",
@@ -338,11 +330,8 @@ pub fn build_unit_atlas(
             }
             let num_frames: u32 = frame_counts[&fc_key];
             let (step, buckets) = facing_config_for_layer(layer);
-            let slope_range: std::ops::RangeInclusive<u8> = if is_ground_vehicle {
-                0..=8
-            } else {
-                0..=0
-            };
+            let slope_range: std::ops::RangeInclusive<u8> =
+                if is_ground_vehicle { 0..=8 } else { 0..=0 };
             for bucket in 0..buckets {
                 let facing: u8 = bucket.saturating_mul(step);
                 for frame in 0..num_frames {
@@ -381,8 +370,7 @@ pub fn build_unit_atlas(
                 Some(id) => id,
                 None => continue,
             };
-            let hc: HouseColorIndex =
-                house_colors.get(bowner_str).copied().unwrap_or_default();
+            let hc: HouseColorIndex = house_colors.get(bowner_str).copied().unwrap_or_default();
             for bucket in 0..TURRET_FACING_BUCKETS {
                 let facing: u8 = bucket.saturating_mul(TURRET_FACING_STEP);
                 needed.insert(UnitSpriteKey {
@@ -427,8 +415,8 @@ pub fn build_unit_atlas(
         // Load VPL file for Blinn-Phong lighting lookup (optional).
         let vpl: Option<VplFile> =
             asset_manager
-                .get("VOXELS.VPL")
-                .and_then(|data| match VplFile::from_bytes(&data) {
+                .get_ref("VOXELS.VPL")
+                .and_then(|data| match VplFile::from_bytes(data) {
                     Ok(v) => {
                         log::info!("Loaded VOXELS.VPL ({} lighting sections)", v.num_sections);
                         Some(v)
@@ -530,8 +518,8 @@ fn render_unit_sprite(
 
     let (vxl_name, hva_name): (String, String) = art_data::voxel_asset_names(&image);
 
-    let vxl_data: Vec<u8> = asset_manager.get(&vxl_name)?;
-    let vxl: VxlFile = match VxlFile::from_bytes(&vxl_data) {
+    let vxl_data = asset_manager.get_ref(&vxl_name)?;
+    let vxl: VxlFile = match VxlFile::from_bytes(vxl_data) {
         Ok(v) => v,
         Err(e) => {
             log::warn!("Failed to parse {}: {}", vxl_name, e);
@@ -542,8 +530,8 @@ fn render_unit_sprite(
     // HVA is optional — some models don't have animation files.
     let hva: Option<HvaFile> =
         asset_manager
-            .get(&hva_name)
-            .and_then(|data| match HvaFile::from_bytes(&data) {
+            .get_ref(&hva_name)
+            .and_then(|data| match HvaFile::from_bytes(data) {
                 Ok(h) => Some(h),
                 Err(e) => {
                     log::trace!("No HVA for {} ({}), using default pose", key.type_id, e);
@@ -586,12 +574,12 @@ fn render_unit_sprite(
 
         // Turret VXL.
         let tur_vxl_name = format!("{}TUR.VXL", image);
-        if let Some(tur_data) = asset_manager.get(&tur_vxl_name) {
-            if let Ok(tur_vxl) = VxlFile::from_bytes(&tur_data) {
+        if let Some(tur_data) = asset_manager.get_ref(&tur_vxl_name) {
+            if let Ok(tur_vxl) = VxlFile::from_bytes(tur_data) {
                 let tur_hva_name = format!("{}TUR.HVA", image);
                 let tur_hva = asset_manager
-                    .get(&tur_hva_name)
-                    .and_then(|d| HvaFile::from_bytes(&d).ok());
+                    .get_ref(&tur_hva_name)
+                    .and_then(|d| HvaFile::from_bytes(d).ok());
                 let (tur_limbs, _) =
                     vxl_raster::prepare_limb_data(&tur_vxl, tur_hva.as_ref(), &params);
                 all_limb_data.extend(tur_limbs);
@@ -602,16 +590,16 @@ fn render_unit_sprite(
         let barl_vxl_name = format!("{}BARL.VXL", image);
         let barrel_vxl_name = format!("{}BARREL.VXL", image);
         let barl_data = asset_manager
-            .get(&barl_vxl_name)
-            .or_else(|| asset_manager.get(&barrel_vxl_name));
+            .get_ref(&barl_vxl_name)
+            .or_else(|| asset_manager.get_ref(&barrel_vxl_name));
         if let Some(bd) = barl_data {
-            if let Ok(barl_vxl) = VxlFile::from_bytes(&bd) {
+            if let Ok(barl_vxl) = VxlFile::from_bytes(bd) {
                 let barl_hva_name = format!("{}BARL.HVA", image);
                 let barrel_hva_name = format!("{}BARREL.HVA", image);
                 let barl_hva = asset_manager
-                    .get(&barl_hva_name)
-                    .or_else(|| asset_manager.get(&barrel_hva_name))
-                    .and_then(|d| HvaFile::from_bytes(&d).ok());
+                    .get_ref(&barl_hva_name)
+                    .or_else(|| asset_manager.get_ref(&barrel_hva_name))
+                    .and_then(|d| HvaFile::from_bytes(d).ok());
                 let (barl_limbs, _) =
                     vxl_raster::prepare_limb_data(&barl_vxl, barl_hva.as_ref(), &params);
                 all_limb_data.extend(barl_limbs);
@@ -800,8 +788,8 @@ fn detect_hva_frame_count(
     };
 
     let frame_count: u32 = asset_manager
-        .get(&hva_name)
-        .and_then(|data| HvaFile::from_bytes(&data).ok())
+        .get_ref(&hva_name)
+        .and_then(|data| HvaFile::from_bytes(data).ok())
         .map(|h| h.frame_count)
         .unwrap_or(1);
 
@@ -809,8 +797,8 @@ fn detect_hva_frame_count(
     if layer == VxlLayer::Barrel && frame_count <= 1 {
         let alt_name: String = format!("{}BARREL.HVA", image);
         let alt_count: u32 = asset_manager
-            .get(&alt_name)
-            .and_then(|data| HvaFile::from_bytes(&data).ok())
+            .get_ref(&alt_name)
+            .and_then(|data| HvaFile::from_bytes(data).ok())
             .map(|h| h.frame_count)
             .unwrap_or(1);
         if alt_count > 1 {
@@ -829,12 +817,12 @@ fn render_optional_layer(
     vpl: Option<&VplFile>,
 ) -> Option<VxlSprite> {
     let vxl_name = format!("{}.VXL", layer_base);
-    let vxl_data = asset_manager.get(&vxl_name)?;
-    let vxl = VxlFile::from_bytes(&vxl_data).ok()?;
+    let vxl_data = asset_manager.get_ref(&vxl_name)?;
+    let vxl = VxlFile::from_bytes(vxl_data).ok()?;
     let hva_name = format!("{}.HVA", layer_base);
     let hva = asset_manager
-        .get(&hva_name)
-        .and_then(|data| HvaFile::from_bytes(&data).ok());
+        .get_ref(&hva_name)
+        .and_then(|data| HvaFile::from_bytes(data).ok());
     Some(vxl_raster::render_vxl(
         &vxl,
         hva.as_ref(),

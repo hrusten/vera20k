@@ -347,12 +347,12 @@ pub(crate) fn build_software_cursor(
     asset_manager: &AssetManager,
 ) -> Option<crate::app_render::SoftwareCursor> {
     let palette = asset_manager
-        .get("mousepal.pal")
-        .and_then(|data| Palette::from_bytes(&data).ok())?;
+        .get_ref("mousepal.pal")
+        .and_then(|data| Palette::from_bytes(data).ok())?;
     let shp_data = asset_manager
-        .get("mouse.sha")
-        .or_else(|| asset_manager.get("mouse.shp"))?;
-    let shp = ShpFile::from_bytes(&shp_data).ok()?;
+        .get_ref("mouse.sha")
+        .or_else(|| asset_manager.get_ref("mouse.shp"))?;
+    let shp = ShpFile::from_bytes(shp_data).ok()?;
     if shp.frames.is_empty() {
         return None;
     }
