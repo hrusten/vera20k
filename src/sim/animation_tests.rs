@@ -409,3 +409,13 @@ fn test_tick_dying_entity_returns_finished_id() {
     let dead = tick_animations(&mut store, &sequences, 16, &interner);
     assert_eq!(dead, vec![1]);
 }
+
+#[test]
+fn test_sequence_is_prone_helper() {
+    assert!(sequence_is_prone(SequenceKind::Prone));
+    assert!(sequence_is_prone(SequenceKind::Crawl));
+    assert!(sequence_is_prone(SequenceKind::FireProne));
+    assert!(sequence_is_prone(SequenceKind::Down));
+    assert!(!sequence_is_prone(SequenceKind::Stand));
+    assert!(!sequence_is_prone(SequenceKind::Up));
+}

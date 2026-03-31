@@ -211,6 +211,25 @@ impl Animation {
     }
 }
 
+/// Whether a sequence represents the infantry being in a prone stance.
+///
+/// This is a temporary stance proxy until the sim carries an explicit prone bit.
+pub fn sequence_is_prone(sequence: SequenceKind) -> bool {
+    matches!(
+        sequence,
+        SequenceKind::Prone
+            | SequenceKind::Crawl
+            | SequenceKind::FireProne
+            | SequenceKind::SecondaryProne
+            | SequenceKind::Down
+    )
+}
+
+/// Whether the current animation represents a prone stance.
+pub fn animation_is_prone(animation: Option<&Animation>) -> bool {
+    animation.is_some_and(|anim| sequence_is_prone(anim.sequence))
+}
+
 /// Collection of sequence definitions for one object type.
 ///
 /// Maps `SequenceKind` → `SequenceDef`. Not all kinds need to be present;

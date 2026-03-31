@@ -57,8 +57,9 @@ pub struct WarheadType {
     pub tiberium: bool,
     /// Bright flash on detonation. Offset +0x14F.
     pub bright: bool,
-    /// Extra damage to prone infantry. Offset +0x150.
-    pub prone_damage: bool,
+    /// Damage multiplier against prone infantry. Offset +0x150 in-game as a double.
+    /// Examples: `50%` -> `0.5`, `100%` -> `1.0`, `300%` -> `3.0`.
+    pub prone_damage: f64,
     /// Instantly destroys any wall. Offset +0x151.
     pub wall_absolute_destroyer: bool,
     /// Chrono legionnaire erase effect. Offset +0x152.
@@ -152,7 +153,7 @@ impl WarheadType {
             rocker: section.get_bool("Rocker").unwrap_or(false),
             tiberium: section.get_bool("Tiberium").unwrap_or(false),
             bright: section.get_bool("Bright").unwrap_or(false),
-            prone_damage: section.get_bool("ProneDamage").unwrap_or(false),
+            prone_damage: section.get_percent("ProneDamage").map(f64::from).unwrap_or(1.0),
             wall_absolute_destroyer: section.get_bool("WallAbsoluteDestroyer").unwrap_or(false),
             temporal: section.get_bool("Temporal").unwrap_or(false),
             is_locomotor: section.get_bool("IsLocomotor").unwrap_or(false),
@@ -233,6 +234,7 @@ mod tests {
         assert!(wh.verses.is_empty());
         assert_eq!(wh.cell_spread, SIM_ZERO);
         assert_eq!(wh.percent_at_max, 100);
+        assert_eq!(wh.prone_damage, 1.0);
         assert!(!wh.wall);
     }
 
@@ -259,5 +261,19 @@ mod tests {
         assert_eq!(result[0], 100);
         assert_eq!(result[1], 50);
         assert_eq!(result[2], 25);
+    }
+
+    #[test]
+    fn test_prone_damage_parses_as_multiplier() {
+        let ini: IniFile =
+            IniFile::from_str("[AP]\nProneDamage=50%\n[Gas]\nProneDamage=300%\n[Raw]\nProneDamage=1.25\n");
+
+        let ap = WarheadType::from_ini_section("AP", ini.section("AP").unwrap());
+        let gas = WarheadType::from_ini_section("Gas", ini.section("Gas").unwrap());
+        let raw = WarheadType::from_ini_section("Raw", ini.section("Raw").unwrap());
+
+        assert!((ap.prone_damage - 0.5).abs() < f64::EPSILON);
+        assert!((gas.prone_damage - 3.0).abs() < f64::EPSILON);
+        assert!((raw.prone_damage - 1.25).abs() < f64::EPSILON);
     }
 }
