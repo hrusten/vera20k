@@ -38,7 +38,7 @@ const LANDING_DURATION_S: SimFixed = SimFixed::lit("0.4");
 const ALTITUDE_VISUAL_SCALE: f32 = 0.06;
 
 /// Phase within the drop pod state machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DropPodPhase {
     /// Falling from high altitude toward ground.
     Falling,
@@ -51,7 +51,7 @@ pub enum DropPodPhase {
 /// Set when a unit is deployed via drop pod reinforcement.
 /// Removed when the landing animation completes — the unit then
 /// reverts to its base locomotor (via the piggyback override system).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DropPodState {
     /// Current phase in the drop sequence.
     pub phase: DropPodPhase,

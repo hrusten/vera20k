@@ -70,3 +70,6 @@ pub mod ai;
 pub mod debug_event_log;
 pub mod replay;
 pub mod selection;
+
+// --- Snapshot serialization (mid-match save/load) ---
+pub mod snapshot;

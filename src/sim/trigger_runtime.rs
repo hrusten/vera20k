@@ -43,20 +43,20 @@ const EVENT_ELAPSED_SCENARIO_TIME: i32 = 47;
 const EVENT_TECHTYPE_EXISTS: i32 = 60;
 const EVENT_TECHTYPE_DOES_NOT_EXIST: i32 = 61;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TriggerEffect {
     CenterCameraAtWaypoint { waypoint: u32, immediate: bool },
     MissionAnnouncement { text: String },
     MissionResult { title: String, detail: String },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 enum MissionAnnouncementKind {
     Victory,
     Defeat,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TriggerRuntime {
     pub elapsed_scenario_ticks: u64,
     pub globals_set: HashSet<u32>,

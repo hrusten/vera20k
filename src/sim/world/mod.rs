@@ -131,6 +131,7 @@ pub struct SimFireEvent {
 }
 
 /// The game simulation - owns all authoritative game state.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Simulation {
     /// String interner for owner/type_ref — zero-cost ID clones instead of heap Strings.
     pub interner: crate::sim::intern::StringInterner,
@@ -148,9 +149,11 @@ pub struct Simulation {
     pub house_alliances: HouseAllianceMap,
     pub(crate) next_stable_entity_id: u64,
     /// Sound events produced during the current tick — drained by the app layer.
+    #[serde(skip)]
     pub sound_events: Vec<SimSoundEvent>,
     /// Fire events produced during combat — drained by the app layer for
     /// muzzle flash rendering and future projectile origin computation.
+    #[serde(skip)]
     pub fire_events: Vec<SimFireEvent>,
     /// Per-AI-owner state for computer-controlled players.
     pub ai_players: Vec<AiPlayerState>,
@@ -159,27 +162,36 @@ pub struct Simulation {
     pub houses: BTreeMap<InternedId, HouseState>,
     /// Per-SpeedType terrain cost grids for cost-aware A* pathfinding.
     /// Built once at map load — units look up their SpeedType to pick the right grid.
+    #[serde(skip)]
     pub terrain_costs: BTreeMap<SpeedType, TerrainCostGrid>,
+    #[serde(skip)]
     pub layered_path_grid: Option<LayeredPathGrid>,
     /// Flat per-cell height grid for height-based LOS (RevealByHeight).
     /// Built once from LayeredPathGrid; indexed by `ry * width + rx`.
+    #[serde(skip)]
     pub(crate) vision_height_grid: Option<Vec<u8>>,
     /// Zone-based connectivity map for instant unreachability detection.
     /// Built from terrain data; rebuilt when buildings or bridges change.
+    #[serde(skip)]
     pub zone_grid: Option<ZoneGrid>,
     /// Previous PathGrid snapshot for incremental zone diffing.
+    #[serde(skip)]
     prev_path_grid: Option<PathGrid>,
+    #[serde(skip)]
     pub resolved_terrain: Option<ResolvedTerrainGrid>,
     pub bridge_state: Option<BridgeRuntimeState>,
     /// SHP interned IDs for bridge destruction explosions (from rules.ini BridgeExplosions=).
+    #[serde(skip)]
     pub bridge_explosions: Vec<InternedId>,
     /// Radar event queue for minimap pings and Spacebar cycling.
+    #[serde(skip)]
     pub radar_events: RadarEventQueue,
     /// Per-player power state (output, drain, low-power flag, spy blackout timer).
     /// Updated each tick by `power_system::tick_power_states()`.
     pub power_states: BTreeMap<InternedId, PowerState>,
     /// Per-cell terrain speed modifier config (slope climb/descend, crowd density).
     /// Built from [General] rules at map load.
+    #[serde(skip)]
     pub terrain_speed_config: terrain_speed::TerrainSpeedConfig,
     /// Distance in leptons below which a blocked unit stops instead of repathing.
     /// From CloseEnough= in [General]. Default 576 (~2.25 cells).
@@ -190,19 +202,23 @@ pub struct Simulation {
     pub blockage_path_delay_ticks: u16,
     /// Temporary world-position SHP animations (warp effects, explosions, etc.).
     /// Ticked each frame, auto-removed when finished.
+    #[serde(skip)]
     pub world_effects: Vec<crate::sim::components::WorldEffect>,
     /// Frame counts for world-effect SHPs, keyed by interned ID (e.g., "WARPOUT" → 20).
     /// Populated from the sprite atlas at init time so sim code can spawn effects
     /// with the correct frame count without hardcoding it.
+    #[serde(skip)]
     pub effect_frame_counts: BTreeMap<InternedId, u16>,
     /// Per-match game settings (crates, short game, superweapons, etc.).
     /// Set once at game start from lobby / [MultiplayerDialogSettings], read-only during gameplay.
     pub game_options: GameOptions,
     /// When true, newly spawned entities get a `DebugEventLog` allocated.
     /// Toggled by the debug inspector hotkey (X). Debug-only — not included in state hashing.
+    #[serde(skip)]
     pub debug_event_logging: bool,
     /// In-memory replay log for this match — records commands + state hashes per tick.
     /// Initialized lazily on the first tick. Observer artifact — not included in state hashing.
+    #[serde(skip)]
     pub replay_log: Option<ReplayLog>,
     /// Input delay in ticks for lockstep-style command scheduling.
     /// Commands are scheduled `now_tick + input_delay_ticks` into the future.
@@ -429,6 +445,41 @@ impl Simulation {
                     h.has_won = true;
                 }
             }
+        }
+    }
+
+    /// Restore skipped cache fields after snapshot deserialization.
+    ///
+    /// The caller must provide the same map/rules data that was used to initialize
+    /// the original simulation. Cache fields were `#[serde(skip)]`'d and are at
+    /// their Default values after deserialization.
+    ///
+    /// Note: `zone_grid` is NOT rebuilt here — it requires the app layer's
+    /// `PathGrid` (built from `path_grid_base` + building footprints). The caller
+    /// should call `rebuild_dynamic_path_grid()` after this method, which triggers
+    /// `rebuild_zone_grid()` as part of the normal tick flow.
+    pub fn rebuild_caches_after_load(
+        &mut self,
+        resolved_terrain: ResolvedTerrainGrid,
+        terrain_speed_config: terrain_speed::TerrainSpeedConfig,
+        bridge_explosions: Vec<InternedId>,
+        effect_frame_counts: BTreeMap<InternedId, u16>,
+        terrain_costs: BTreeMap<SpeedType, TerrainCostGrid>,
+    ) {
+        // 1. Restore externally-derived data
+        self.resolved_terrain = Some(resolved_terrain);
+        self.terrain_speed_config = terrain_speed_config;
+        self.bridge_explosions = bridge_explosions;
+        self.effect_frame_counts = effect_frame_counts;
+        self.terrain_costs = terrain_costs;
+
+        // 2. Rebuild spatial caches from restored data
+        self.refresh_terrain_views();
+        self.sync_building_footprints_to_layered_grid(None);
+
+        // 3. Rebuild cached screen coords for all entities
+        for entity in self.entities.values_mut() {
+            entity.position.refresh_screen_coords();
         }
     }
 

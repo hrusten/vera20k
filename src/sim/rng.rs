@@ -4,7 +4,7 @@
 //! This keeps replay and lockstep call order auditable.
 
 /// Deterministic simulation RNG.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SimRng {
     state: u64,
 }

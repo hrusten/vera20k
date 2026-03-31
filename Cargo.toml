@@ -41,11 +41,12 @@ eframe = { version = "0.33", default-features = false, features = ["default_font
 glam = "0.29"
 # fixed-point math for deterministic simulation. ALL sim math uses this, never floats.
 # This ensures multiplayer lockstep stays in sync across different machines.
-fixed = "1"
+fixed = { version = "1", features = ["serde"] }
 
 # --- Serialization ---
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+bincode = "1"
 ron = "0.8"
 # toml for config.toml parsing (game settings, asset paths).
 toml = "0.8"

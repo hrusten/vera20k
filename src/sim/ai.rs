@@ -40,7 +40,7 @@ const AI_FIRST_ATTACK_TICK: u64 = 150;
 const AI_ATTACK_WAVE_SIZE: usize = 8;
 
 /// Per-AI-owner persistent state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AiPlayerState {
     /// House/owner name this AI controls.
     pub owner: InternedId,

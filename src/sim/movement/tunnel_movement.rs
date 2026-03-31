@@ -38,7 +38,7 @@ const DIG_IN_DURATION_S: SimFixed = SimFixed::lit("0.8");
 const DIG_OUT_DURATION_S: SimFixed = SimFixed::lit("0.8");
 
 /// Phase within the tunnel state machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TunnelPhase {
     /// Short route: using normal ground movement (delegated to movement.rs).
     SurfaceMove,
@@ -54,7 +54,7 @@ pub enum TunnelPhase {
 ///
 /// Attached when a tunnel-locomotor unit receives a move order with a route
 /// longer than the burrow threshold. Removed when the unit surfaces.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TunnelState {
     /// Current phase in the tunnel sequence.
     pub phase: TunnelPhase,

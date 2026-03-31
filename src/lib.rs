@@ -119,7 +119,9 @@ pub mod app_instances;
 pub mod app_spawn_pick;
 
 // Debug visualization overlays — pathgrid walkability, terrain costs.
-// Toggled via hotkeys (F5 = pathgrid).
+// Toggled via hotkeys (P / F9 = pathgrid).
 pub mod app_debug_overlays;
 // Debug info panel — egui overlay with PathGrid/entity info (shown with pathgrid overlay).
 pub mod app_debug_panel;
+// Save/load panel — egui overlay for managing save files (F5).
+pub mod app_save_load_panel;

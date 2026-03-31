@@ -22,7 +22,7 @@ use crate::sim::production::foundation_dimensions;
 /// - States 0-1 (validate + clear obstructions) -> Approach
 /// - States 2-3 (rotate + move to dock) -> EnterDock
 /// - States 5-6 (linked + idle on pad) -> Servicing
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DockPhase {
     /// Moving toward the dock building via pathfinding.
     Approach,
@@ -37,7 +37,7 @@ pub enum DockPhase {
 }
 
 /// Per-entity docking state, stored as `Option<DockState>` on `GameEntity`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DockState {
     /// StableEntityId of the target repair depot building.
     pub dock_building_id: u64,

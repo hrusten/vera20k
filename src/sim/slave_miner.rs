@@ -25,7 +25,7 @@ use crate::sim::production::credits_entry_for_owner;
 use crate::sim::world::Simulation;
 
 /// Deployed state of a Slave Miner (SMIN vehicle ↔ YAREFN building).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SlaveMinerMode {
     /// SMIN vehicle form — moving toward ore field to deploy.
     Mobile,
@@ -38,7 +38,7 @@ pub enum SlaveMinerMode {
 }
 
 /// Slave harvest AI state machine — one per SLAV infantry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SlaveHarvestState {
     /// Looking for nearest ore cell within scan radius of master.
     SearchOre,
@@ -58,7 +58,7 @@ pub enum SlaveHarvestState {
 ///
 /// Each slave has its own mini harvest loop: find ore near master,
 /// walk to it, harvest, walk back, deposit at master, repeat.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SlaveHarvester {
     /// Stable ID of the master entity (deployed YAREFN or mobile SMIN).
     pub master_id: u64,

@@ -50,7 +50,7 @@ const DEFAULT_DIE_TICK_MS: u32 = 80;
 /// by a `SequenceDef`. An entity plays one sequence at a time.
 ///
 /// Maps to art.ini sequence keys: Ready/Guard → Stand, FireUp → Attack, etc.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SequenceKind {
     /// Standing alert pose. Default state for idle entities (Ready/Guard in INI).
     Stand,
@@ -121,7 +121,7 @@ pub enum SequenceKind {
 }
 
 /// How a sequence behaves when it reaches its last frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LoopMode {
     /// Restart from frame 0 when reaching the end (walk, stand).
     Loop,
@@ -147,7 +147,7 @@ pub enum LoopMode {
 /// RA2's DirStruct byte (0–255) is screen-relative clockwise (0=N, 64=E,
 /// 128=S, 192=W). SHP frames are laid out counter-clockwise (0=N, 1=NW,
 /// 2=W...). `resolve_shp_frame` negates the quantized index to convert.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SequenceDef {
     /// First SHP frame index for this sequence.
     pub start_frame: u16,
@@ -174,7 +174,7 @@ pub struct SequenceDef {
 /// Attach to any entity that should animate. The `tick_animations()` system
 /// reads and updates this each frame. The render loop reads `sequence` and
 /// `frame_index` to select the correct SHP frame via `resolve_shp_frame()`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Animation {
     /// Currently playing sequence.
     pub sequence: SequenceKind,
@@ -213,7 +213,7 @@ impl Animation {
 ///
 /// Maps `SequenceKind` → `SequenceDef`. Not all kinds need to be present;
 /// entities hold their current frame if the active sequence is missing.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct SequenceSet {
     sequences: BTreeMap<SequenceKind, SequenceDef>,
 }

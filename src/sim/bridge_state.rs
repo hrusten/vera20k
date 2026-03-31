@@ -7,19 +7,19 @@
 use crate::map::resolved_terrain::ResolvedTerrainGrid;
 use std::collections::{BTreeMap, VecDeque};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct BridgeDamageEvent {
     pub rx: u16,
     pub ry: u16,
     pub damage: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BridgeStateChange {
     pub destroyed_cells: Vec<(u16, u16)>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct BridgeRuntimeCell {
     pub deck_present: bool,
     pub destroyed: bool,
@@ -28,7 +28,7 @@ pub struct BridgeRuntimeCell {
     pub bridge_group_id: Option<u16>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct BridgeRuntimeState {
     width: u16,
     height: u16,

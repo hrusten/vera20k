@@ -7,7 +7,7 @@
 /// Per-match game settings from the lobby / `[MultiplayerDialogSettings]`.
 ///
 /// Set once at game start, read-only during gameplay.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GameOptions {
     // --- Runtime-checked by gameplay systems ---
     /// Defeat when all buildings lost (vs all objects lost). Rules+0x14B6.

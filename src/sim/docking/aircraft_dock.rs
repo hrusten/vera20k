@@ -28,7 +28,7 @@ use crate::sim::world::Simulation;
 ///
 /// Present only on aircraft with `Ammo= >= 0` in rules.ini.
 /// Entities with `Ammo=-1` (unlimited, the default) have `None`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AircraftAmmo {
     /// Current ammo count. 0 = depleted, triggers auto-return.
     pub current: i32,
@@ -59,7 +59,7 @@ impl AircraftAmmo {
 }
 
 /// Docking lifecycle phases for aircraft returning to an airfield.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AircraftDockPhase {
     /// Flying toward the target airfield.
     ReturnToBase,
@@ -81,7 +81,7 @@ pub enum AircraftDockPhase {
 ///
 /// Unlike `DockReservations` (single occupant per building), airfields support
 /// `NumberOfDocks` simultaneous occupants (e.g., 4 for Allied Air Force Command).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct AirfieldDocks {
     /// Maps airfield stable_id → (occupied_count, max_slots).
     slots: BTreeMap<u64, (u8, u8)>,

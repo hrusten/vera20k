@@ -80,7 +80,7 @@ fn floor_div(a: i32, b: i32) -> i32 {
 /// Position is in lepton offsets within the cell. In the original engine,
 /// (0, 0) is the cell reference point; values range roughly -256..256
 /// depending on whether the curve crosses cell boundaries.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TrackPoint {
     /// Lepton offset X within cell.
     pub x: i16,
@@ -94,7 +94,7 @@ pub struct TrackPoint {
 ///
 /// There are 16 raw tracks covering different turn geometries.
 /// Each references a slice of the global TRACK_POINTS array.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct RawTrack {
     /// Index into TRACK_POINTS where this track's point array starts.
     pub points_start: u16,
@@ -117,7 +117,7 @@ pub struct RawTrack {
 ///
 /// There are 72 turn configurations (one per 5° increment, 360/5=72).
 /// Each maps to a RawTrack index for normal-speed and short/fast turns.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TurnTrack {
     /// Index into RAW_TRACKS for the smooth (normal speed) curve.
     pub normal_track: u8,
@@ -134,7 +134,7 @@ pub struct TurnTrack {
 /// Created when a Drive vehicle begins a cell transition that involves a
 /// facing change. Consumed by tick_movement to advance position/facing along
 /// the track. Cleared when the track completes or the vehicle is rerouted.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DriveTrackState {
     /// Index into RAW_TRACKS for the active curve.
     pub raw_track_index: u8,

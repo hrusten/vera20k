@@ -19,7 +19,7 @@ pub const STARTING_CREDITS: i32 = 5000;
 pub(super) const PRODUCTION_RATE_SCALE: u64 = 1_000_000;
 
 /// One queued build item.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildQueueItem {
     pub owner: InternedId,
     pub type_id: InternedId,
@@ -139,7 +139,7 @@ pub enum ProductionCategory {
     Aircraft,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BuildQueueState {
     Queued,
     Building,
@@ -189,7 +189,7 @@ pub(super) enum BuildMode {
 }
 
 /// Player production state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductionState {
     pub queues_by_owner: BTreeMap<InternedId, BTreeMap<ProductionCategory, VecDeque<BuildQueueItem>>>,
     pub ready_by_owner: BTreeMap<InternedId, VecDeque<InternedId>>,

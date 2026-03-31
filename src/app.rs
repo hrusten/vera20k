@@ -280,6 +280,10 @@ pub(crate) struct AppState {
     pub(crate) show_hotkey_help: bool,
     /// Debug unit inspector — shows event history for selected entities. Toggle with X.
     pub(crate) debug_unit_inspector: bool,
+    /// Save/load panel visible. Toggle with F5.
+    pub(crate) show_save_load_panel: bool,
+    /// Cached save-file listing for the save/load panel (avoids per-frame disk I/O).
+    pub(crate) save_list_cache: crate::app_save_load_panel::SaveListCache,
     // -- Reusable per-frame scratch buffers (avoid allocation each frame) --
     /// Overlay instance scratch vec — cleared and refilled each frame.
     pub(crate) cached_overlay_instances: Vec<crate::render::batch::SpriteInstance>,
@@ -349,9 +353,12 @@ impl ApplicationHandler for App {
         // (mission banner). The custom sidebar handles its own hit-testing.
         // Ignore egui's `consumed` flag in-game to avoid stale UI state
         // from the Loading screen blocking mouse/keyboard input.
-        // Exception: when paused, egui renders the interactive pause menu.
-        let egui_consumed: bool =
-            egui_response.consumed && (state.screen != GameScreen::InGame || state.paused);
+        // Exception: when paused or save/load panel is open, egui renders
+        // interactive content.
+        let egui_consumed: bool = egui_response.consumed
+            && (state.screen != GameScreen::InGame
+                || state.paused
+                || state.show_save_load_panel);
 
         match event {
             WindowEvent::CloseRequested => {
@@ -632,6 +639,8 @@ impl App {
             debug_show_heightmap: false,
             show_hotkey_help: false,
             debug_unit_inspector: false,
+            show_save_load_panel: false,
+            save_list_cache: crate::app_save_load_panel::SaveListCache::new(),
             displayed_credits: HashMap::new(),
             cached_overlay_instances: Vec::new(),
             cached_unit_instances: Vec::new(),
@@ -789,6 +798,9 @@ impl App {
                 if let Some(prev) = prev_visuals {
                     crate::app_debug_panel::pop_debug_light_visuals(&state.egui.ctx, prev);
                 }
+                if state.show_save_load_panel {
+                    Self::handle_save_load_panel(state);
+                }
                 if state.paused {
                     Self::handle_pause_menu(state);
                 }
@@ -896,6 +908,34 @@ impl App {
                 log::info!("Game speed set to {} tps", tps);
             }
             PauseMenuAction::None => {}
+        }
+    }
+
+    /// Draw the save/load panel and handle its actions.
+    fn handle_save_load_panel(state: &mut AppState) {
+        use crate::app_save_load_panel::SaveLoadAction;
+
+        let action = crate::app_save_load_panel::draw_save_load_panel(
+            &state.egui.ctx,
+            &mut state.save_list_cache,
+        );
+
+        match action {
+            SaveLoadAction::Load(path) => {
+                app_input::load_save_file(state, &path);
+            }
+            SaveLoadAction::Delete(path) => {
+                if let Err(e) = std::fs::remove_file(&path) {
+                    log::error!("Failed to delete save {}: {e}", path.display());
+                } else {
+                    log::info!("Deleted save: {}", path.display());
+                }
+                state.save_list_cache.invalidate();
+            }
+            SaveLoadAction::Close => {
+                state.show_save_load_panel = false;
+            }
+            SaveLoadAction::None => {}
         }
     }
 }
