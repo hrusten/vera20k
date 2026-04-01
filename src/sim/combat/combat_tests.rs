@@ -299,7 +299,10 @@ fn test_prone_infantry_takes_scaled_direct_damage() {
     tick_combat(&mut store, &rules, &mut interner, &mut BTreeMap::new(), 100);
 
     let target_health = store.get(2).expect("target alive").health.current;
-    assert_eq!(target_health, 75, "100 damage with ProneDamage=50% should deal 50");
+    assert_eq!(
+        target_health, 75,
+        "100 damage with ProneDamage=50% should deal 50"
+    );
 }
 
 #[test]
@@ -331,7 +334,10 @@ fn test_prone_infantry_takes_scaled_aoe_damage() {
     tick_combat(&mut store, &rules, &mut interner, &mut BTreeMap::new(), 100);
 
     let target_health = store.get(2).expect("target alive").health.current;
-    assert_eq!(target_health, 75, "AoE center hit should also respect ProneDamage=50%");
+    assert_eq!(
+        target_health, 75,
+        "AoE center hit should also respect ProneDamage=50%"
+    );
 }
 
 #[test]

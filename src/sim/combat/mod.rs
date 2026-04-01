@@ -89,7 +89,7 @@ pub fn armor_index(armor: &str) -> usize {
 }
 
 pub(crate) fn apply_prone_damage_modifier(
-    target: &GameEntity,
+    target_prone_infantry: bool,
     warhead: &WarheadType,
     damage: i32,
 ) -> u16 {
@@ -97,8 +97,8 @@ pub(crate) fn apply_prone_damage_modifier(
         return 0;
     }
 
-    let scaled = if target.category == EntityCategory::Infantry && animation_is_prone(target.animation.as_ref()) {
-        (damage as f64 * warhead.prone_damage).trunc() as i32
+    let scaled = if target_prone_infantry {
+        (damage as u64 * warhead.prone_damage_basis_points as u64 / 10_000) as i32
     } else {
         damage
     };
@@ -891,6 +891,12 @@ pub fn tick_combat_with_fog(
                 t.category,
                 t.type_ref,
                 t.owner,
+                // TODO(RE): This currently keys off prone animation sequences because
+                // the runtime has no separate prone-state bit yet. Reverse engineer
+                // and implement the real infantry prone-entry conditions so
+                // ProneDamage applies during normal gameplay instead of only when
+                // prone sequences are explicitly driven.
+                t.category == EntityCategory::Infantry && animation_is_prone(t.animation.as_ref()),
             )
         });
 
@@ -903,9 +909,10 @@ pub fn tick_combat_with_fog(
             target_cat,
             target_type_ref,
             target_owner,
+            target_prone_infantry,
         ) = match target_data {
-            Some((rx, ry, sx, sy, hp, cat, tr, own)) if hp > 0 => {
-                (rx, ry, sx, sy, hp, cat, tr, own)
+            Some((rx, ry, sx, sy, hp, cat, tr, own, prone)) if hp > 0 => {
+                (rx, ry, sx, sy, hp, cat, tr, own, prone)
             }
             _ => {
                 if let Some(new_target) = acquire_best_target(
@@ -1094,10 +1101,8 @@ pub fn tick_combat_with_fog(
             // Integer damage: base_damage * verses_pct / 100.
             // base_damage already includes OccupyDamageMultiplier for garrison.
             let raw_damage: i32 = base_damage * selected.verses_pct as i32 / 100;
-            let actual_damage: u16 = entities
-                .get(snap.target)
-                .map(|target| apply_prone_damage_modifier(target, warhead, raw_damage))
-                .unwrap_or(0);
+            let actual_damage: u16 =
+                apply_prone_damage_modifier(target_prone_infantry, warhead, raw_damage);
             if actual_damage > 0 {
                 let wh_iid = interner.intern(&warhead.id);
                 damage_events.push((snap.target, actual_damage, snap.stable_id, wh_iid));
