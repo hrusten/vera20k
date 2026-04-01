@@ -5,8 +5,10 @@
 use std::collections::BTreeMap;
 
 use super::*;
+use crate::map::entities::EntityCategory;
 use crate::rules::ini_parser::IniFile;
 use crate::rules::ruleset::RuleSet;
+use crate::sim::animation::{Animation, SequenceKind};
 use crate::sim::components::Health;
 use crate::sim::entity_store::EntityStore;
 use crate::sim::game_entity::GameEntity;
@@ -55,6 +57,14 @@ fn make_entity_owned(
         current: hp,
         max: hp,
     };
+    e
+}
+
+fn make_infantry_entity(id: u64, type_ref: &str, rx: u16, ry: u16, hp: u16) -> GameEntity {
+    let mut e = make_entity(id, type_ref, rx, ry, hp);
+    e.category = EntityCategory::Infantry;
+    e.is_voxel = false;
+    e.animation = Some(Animation::new(SequenceKind::Stand));
     e
 }
 
@@ -258,6 +268,70 @@ fn test_infantry_vs_heavy_armor() {
         300 - 6,
         "Infantry vs heavy armor should do 6 damage (25 * 25 / 100)"
     );
+}
+
+#[test]
+fn test_prone_infantry_takes_scaled_direct_damage() {
+    let rules = RuleSet::from_ini(&IniFile::from_str(
+        "[InfantryTypes]\n0=E1\n1=E2\n\n\
+         [VehicleTypes]\n0=MTNK\n\n\
+         [AircraftTypes]\n\n\
+         [BuildingTypes]\n\n\
+         [E1]\nStrength=125\nArmor=flak\nSpeed=4\nPrimary=M60\n\n\
+         [E2]\nStrength=125\nArmor=flak\nSpeed=4\n\n\
+         [MTNK]\nStrength=300\nArmor=heavy\nSpeed=6\nPrimary=105mm\n\n\
+         [M60]\nDamage=25\nROF=20\nRange=5\nWarhead=SA\n\n\
+         [105mm]\nDamage=100\nROF=50\nRange=6\nWarhead=AP\n\n\
+         [SA]\nVerses=100%,100%,100%,90%,70%,25%,100%,25%,25%,0%,0%\n\n\
+         [AP]\nVerses=100%,100%,90%,75%,75%,75%,60%,30%,20%,0%,0%\nProneDamage=50%\n",
+    ))
+    .expect("prone combat rules should parse");
+
+    let mut store = EntityStore::new();
+    store.insert(make_entity(1, "MTNK", 5, 5, 300));
+    let mut target = make_infantry_entity(2, "E2", 8, 5, 125);
+    target.animation = Some(Animation::new(SequenceKind::Prone));
+    store.insert(target);
+
+    let mut interner = test_interner();
+    issue_attack_command(&mut store, 1, 2, None, &interner);
+
+    tick_combat(&mut store, &rules, &mut interner, &mut BTreeMap::new(), 100);
+
+    let target_health = store.get(2).expect("target alive").health.current;
+    assert_eq!(target_health, 75, "100 damage with ProneDamage=50% should deal 50");
+}
+
+#[test]
+fn test_prone_infantry_takes_scaled_aoe_damage() {
+    let rules = RuleSet::from_ini(&IniFile::from_str(
+        "[InfantryTypes]\n0=E1\n1=E2\n\n\
+         [VehicleTypes]\n0=MTNK\n\n\
+         [AircraftTypes]\n\n\
+         [BuildingTypes]\n\n\
+         [E1]\nStrength=125\nArmor=flak\nSpeed=4\nPrimary=M60\n\n\
+         [E2]\nStrength=125\nArmor=flak\nSpeed=4\n\n\
+         [MTNK]\nStrength=300\nArmor=heavy\nSpeed=6\nPrimary=105mm\n\n\
+         [M60]\nDamage=25\nROF=20\nRange=5\nWarhead=SA\n\n\
+         [105mm]\nDamage=100\nROF=50\nRange=6\nWarhead=AP\n\n\
+         [SA]\nVerses=100%,100%,100%,90%,70%,25%,100%,25%,25%,0%,0%\n\n\
+         [AP]\nCellSpread=1\nPercentAtMax=1\nVerses=100%,100%,90%,75%,75%,75%,60%,30%,20%,0%,0%\nProneDamage=50%\n",
+    ))
+    .expect("prone aoe combat rules should parse");
+
+    let mut store = EntityStore::new();
+    store.insert(make_entity(1, "MTNK", 5, 5, 300));
+    let mut target = make_infantry_entity(2, "E2", 8, 5, 125);
+    target.animation = Some(Animation::new(SequenceKind::Prone));
+    store.insert(target);
+
+    let mut interner = test_interner();
+    issue_attack_command(&mut store, 1, 2, None, &interner);
+
+    tick_combat(&mut store, &rules, &mut interner, &mut BTreeMap::new(), 100);
+
+    let target_health = store.get(2).expect("target alive").health.current;
+    assert_eq!(target_health, 75, "AoE center hit should also respect ProneDamage=50%");
 }
 
 #[test]

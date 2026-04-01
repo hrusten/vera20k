@@ -13,7 +13,7 @@
 //! - Part of sim/ — depends on rules/ (RuleSet, WarheadType) and sim/components.
 //! - sim/ NEVER depends on render/, ui/, sidebar/, audio/, net/.
 
-use super::{armor_index, lepton_distance_sq_raw};
+use super::{apply_prone_damage_modifier, armor_index, lepton_distance_sq_raw};
 use crate::rules::ruleset::RuleSet;
 use crate::rules::warhead_type::WarheadType;
 use crate::sim::entity_store::EntityStore;
@@ -87,13 +87,14 @@ pub(crate) fn apply_aoe_damage(
         let idx: usize = armor_index(armor_str);
         let verses_pct: u8 = warhead.verses.get(idx).copied().unwrap_or(100);
 
-        let dmg: u16 = aoe_damage_at_distance(
+        let raw_damage: u16 = aoe_damage_at_distance(
             base_damage,
             distance,
             cell_spread,
             warhead.percent_at_max,
             verses_pct,
         );
+        let dmg: u16 = apply_prone_damage_modifier(entity, warhead, raw_damage as i32);
 
         if dmg > 0 {
             damage_list.push((entity.stable_id, dmg));

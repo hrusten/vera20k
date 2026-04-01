@@ -35,6 +35,8 @@ use self::combat_weapon::select_weapon_with_ifv;
 use crate::map::entities::EntityCategory;
 use crate::rules::object_type::ObjectType;
 use crate::rules::ruleset::RuleSet;
+use crate::rules::warhead_type::WarheadType;
+use crate::sim::animation::animation_is_prone;
 use crate::sim::bridge_state::BridgeDamageEvent;
 use crate::sim::entity_store::EntityStore;
 use crate::sim::intern::{InternedId, StringInterner};
@@ -84,6 +86,24 @@ const ARMOR_NAMES: &[&str] = &[
 pub fn armor_index(armor: &str) -> usize {
     let lower: String = armor.to_ascii_lowercase();
     ARMOR_NAMES.iter().position(|&a| a == lower).unwrap_or(0)
+}
+
+pub(crate) fn apply_prone_damage_modifier(
+    target: &GameEntity,
+    warhead: &WarheadType,
+    damage: i32,
+) -> u16 {
+    if damage <= 0 {
+        return 0;
+    }
+
+    let scaled = if target.category == EntityCategory::Infantry && animation_is_prone(target.animation.as_ref()) {
+        (damage as f64 * warhead.prone_damage).trunc() as i32
+    } else {
+        damage
+    };
+
+    scaled.clamp(0, u16::MAX as i32) as u16
 }
 
 /// Component: this entity is attacking a specific target entity.
@@ -1074,7 +1094,10 @@ pub fn tick_combat_with_fog(
             // Integer damage: base_damage * verses_pct / 100.
             // base_damage already includes OccupyDamageMultiplier for garrison.
             let raw_damage: i32 = base_damage * selected.verses_pct as i32 / 100;
-            let actual_damage: u16 = raw_damage.max(0) as u16;
+            let actual_damage: u16 = entities
+                .get(snap.target)
+                .map(|target| apply_prone_damage_modifier(target, warhead, raw_damage))
+                .unwrap_or(0);
             if actual_damage > 0 {
                 let wh_iid = interner.intern(&warhead.id);
                 damage_events.push((snap.target, actual_damage, snap.stable_id, wh_iid));
