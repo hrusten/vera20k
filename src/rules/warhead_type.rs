@@ -57,9 +57,9 @@ pub struct WarheadType {
     pub tiberium: bool,
     /// Bright flash on detonation. Offset +0x14F.
     pub bright: bool,
-    /// Damage multiplier against prone infantry. Offset +0x150 in-game as a double.
-    /// Examples: `50%` -> `0.5`, `100%` -> `1.0`, `300%` -> `3.0`.
-    pub prone_damage: f64,
+    /// Damage multiplier against prone infantry, stored as 1.0 = 10_000 basis points.
+    /// Examples: `50%` -> `5_000`, `100%` -> `10_000`, `300%` -> `30_000`.
+    pub prone_damage_basis_points: u32,
     /// Instantly destroys any wall. Offset +0x151.
     pub wall_absolute_destroyer: bool,
     /// Chrono legionnaire erase effect. Offset +0x152.
@@ -153,7 +153,7 @@ impl WarheadType {
             rocker: section.get_bool("Rocker").unwrap_or(false),
             tiberium: section.get_bool("Tiberium").unwrap_or(false),
             bright: section.get_bool("Bright").unwrap_or(false),
-            prone_damage: section.get_percent("ProneDamage").map(f64::from).unwrap_or(1.0),
+            prone_damage_basis_points: parse_prone_damage_basis_points(section),
             wall_absolute_destroyer: section.get_bool("WallAbsoluteDestroyer").unwrap_or(false),
             temporal: section.get_bool("Temporal").unwrap_or(false),
             is_locomotor: section.get_bool("IsLocomotor").unwrap_or(false),
@@ -200,6 +200,29 @@ fn parse_verses(raw: &str) -> Vec<u8> {
         .collect()
 }
 
+fn parse_prone_damage_basis_points(section: &IniSection) -> u32 {
+    let Some(raw) = section.get("ProneDamage") else {
+        return 10_000;
+    };
+
+    let value = raw.trim();
+    let basis_points = if let Some(stripped) = value.strip_suffix('%') {
+        stripped.trim().parse::<f64>().ok().map(|v| v * 100.0)
+    } else {
+        value.parse::<f64>().ok().map(|v| v * 10_000.0)
+    };
+
+    let Some(basis_points) = basis_points else {
+        return 10_000;
+    };
+
+    if !basis_points.is_finite() || basis_points < 0.0 {
+        return 10_000;
+    }
+
+    basis_points.round().clamp(0.0, u32::MAX as f64) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,7 +257,7 @@ mod tests {
         assert!(wh.verses.is_empty());
         assert_eq!(wh.cell_spread, SIM_ZERO);
         assert_eq!(wh.percent_at_max, 100);
-        assert_eq!(wh.prone_damage, 1.0);
+        assert_eq!(wh.prone_damage_basis_points, 10_000);
         assert!(!wh.wall);
     }
 
@@ -265,15 +288,31 @@ mod tests {
 
     #[test]
     fn test_prone_damage_parses_as_multiplier() {
-        let ini: IniFile =
-            IniFile::from_str("[AP]\nProneDamage=50%\n[Gas]\nProneDamage=300%\n[Raw]\nProneDamage=1.25\n");
+        let ini: IniFile = IniFile::from_str(
+            "[AP]\nProneDamage=50%\n[Gas]\nProneDamage=300%\n[Raw]\nProneDamage=1.25\n",
+        );
 
         let ap = WarheadType::from_ini_section("AP", ini.section("AP").unwrap());
         let gas = WarheadType::from_ini_section("Gas", ini.section("Gas").unwrap());
         let raw = WarheadType::from_ini_section("Raw", ini.section("Raw").unwrap());
 
-        assert!((ap.prone_damage - 0.5).abs() < f64::EPSILON);
-        assert!((gas.prone_damage - 3.0).abs() < f64::EPSILON);
-        assert!((raw.prone_damage - 1.25).abs() < f64::EPSILON);
+        assert_eq!(ap.prone_damage_basis_points, 5_000);
+        assert_eq!(gas.prone_damage_basis_points, 30_000);
+        assert_eq!(raw.prone_damage_basis_points, 12_500);
+    }
+
+    #[test]
+    fn test_prone_damage_invalid_values_fall_back_to_default() {
+        let ini: IniFile = IniFile::from_str(
+            "[Neg]\nProneDamage=-1\n[Bad]\nProneDamage=wat\n[Huge]\nProneDamage=inf\n",
+        );
+
+        let neg = WarheadType::from_ini_section("Neg", ini.section("Neg").unwrap());
+        let bad = WarheadType::from_ini_section("Bad", ini.section("Bad").unwrap());
+        let huge = WarheadType::from_ini_section("Huge", ini.section("Huge").unwrap());
+
+        assert_eq!(neg.prone_damage_basis_points, 10_000);
+        assert_eq!(bad.prone_damage_basis_points, 10_000);
+        assert_eq!(huge.prone_damage_basis_points, 10_000);
     }
 }
