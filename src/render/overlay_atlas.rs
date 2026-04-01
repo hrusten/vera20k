@@ -18,7 +18,7 @@ use crate::assets::pal_file::Palette;
 use crate::assets::shp_file::ShpFile;
 use crate::map::overlay::{OverlayEntry, TerrainObject};
 use crate::map::overlay_types::{
-    resolve_overlay_name_for_render, OverlayTypeFlags, OverlayTypeRegistry,
+    OverlayTypeFlags, OverlayTypeRegistry, resolve_overlay_name_for_render,
 };
 use crate::render::batch::{BatchRenderer, BatchTexture};
 use crate::render::gpu::GpuContext;
@@ -166,7 +166,12 @@ pub fn build_overlay_atlas(
     // need all frames loaded; static objects just need frame 0.
     let mut terrain_anim_frames: HashMap<String, u8> = HashMap::new();
     for obj in terrain_objects {
-        if terrain_anim_frames.contains_key(&obj.name) || needed.contains(&OverlaySpriteKey { name: obj.name.clone(), frame: 0 }) {
+        if terrain_anim_frames.contains_key(&obj.name)
+            || needed.contains(&OverlaySpriteKey {
+                name: obj.name.clone(),
+                frame: 0,
+            })
+        {
             // Already processed this terrain type.
             continue;
         }
@@ -288,7 +293,12 @@ pub fn build_overlay_atlas(
         );
     }
 
-    Some(pack_overlay_sprites(gpu, batch, &rendered, terrain_anim_frames))
+    Some(pack_overlay_sprites(
+        gpu,
+        batch,
+        &rendered,
+        terrain_anim_frames,
+    ))
 }
 
 /// Load and render a single overlay SHP sprite to RGBA pixels.
@@ -342,10 +352,10 @@ fn render_overlay_sprite(
     let mut found_name: String = String::new();
     let mut shp_opt: Option<ShpFile> = None;
     for name in &candidates {
-        let Some(data) = asset_manager.get(name) else {
+        let Some(data) = asset_manager.get_ref(name) else {
             continue;
         };
-        let Ok(shp) = ShpFile::from_bytes(&data) else {
+        let Ok(shp) = ShpFile::from_bytes(data) else {
             continue;
         };
         // Skip template files with no drawable frames (e.g. some bridge stubs).
@@ -565,10 +575,10 @@ pub fn compute_tiberium_radar_colors(
         );
 
         for candidate in &candidates {
-            let Some(data) = asset_manager.get(candidate) else {
+            let Some(data) = asset_manager.get_ref(candidate) else {
                 continue;
             };
-            let Ok(shp) = ShpFile::from_bytes(&data) else {
+            let Ok(shp) = ShpFile::from_bytes(data) else {
                 continue;
             };
             shp_cache.insert(overlay_id, shp);
@@ -626,10 +636,10 @@ fn probe_terrain_shp_frame_count(
         theater_name,
     );
     for candidate in &candidates {
-        let Some(data) = asset_manager.get(candidate) else {
+        let Some(data) = asset_manager.get_ref(candidate) else {
             continue;
         };
-        let Ok(shp) = ShpFile::from_bytes(&data) else {
+        let Ok(shp) = ShpFile::from_bytes(data) else {
             continue;
         };
         // Terrain SHPs store shadow frames in the second half (same layout
@@ -761,5 +771,9 @@ fn pack_overlay_sprites(
     );
 
     let texture: BatchTexture = batch.create_texture(gpu, &rgba, atlas_width, atlas_height);
-    OverlayAtlas { texture, entries, terrain_anim_frames }
+    OverlayAtlas {
+        texture,
+        entries,
+        terrain_anim_frames,
+    }
 }

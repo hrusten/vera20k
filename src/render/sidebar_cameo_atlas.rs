@@ -110,10 +110,10 @@ pub fn export_debug_palette_sheet(
     let mut max_cameo_w = 1u32;
     let mut max_cameo_h = 1u32;
     for &palette_name in palette_names {
-        let Some(data) = asset_manager.get(palette_name) else {
+        let Some(data) = asset_manager.get_ref(palette_name) else {
             continue;
         };
-        let Ok(palette) = Palette::from_bytes(&data) else {
+        let Ok(palette) = Palette::from_bytes(data) else {
             continue;
         };
         let mut row: Vec<RenderedCameo> = Vec::new();
@@ -212,8 +212,8 @@ fn render_cameo(
 
     let (data, file_name) = candidates
         .iter()
-        .find_map(|name| asset_manager.get(name).map(|data| (data, name.clone())))?;
-    let shp = ShpFile::from_bytes(&data).ok()?;
+        .find_map(|name| asset_manager.get_ref(name).map(|data| (data, name.clone())))?;
+    let shp = ShpFile::from_bytes(data).ok()?;
     if shp.frames.is_empty() {
         return None;
     }

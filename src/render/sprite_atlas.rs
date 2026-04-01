@@ -186,9 +186,10 @@ pub fn collect_needed_base_keys(
         }
         let owner_str = interner.map_or("", |i| i.resolve(entity.owner));
         let type_str = interner.map_or("", |i| i.resolve(entity.type_ref));
-        let color_idx: HouseColorIndex =
-            house_colors.get(owner_str).copied()
-                .unwrap_or(crate::rules::house_colors::NO_REMAP);
+        let color_idx: HouseColorIndex = house_colors
+            .get(owner_str)
+            .copied()
+            .unwrap_or(crate::rules::house_colors::NO_REMAP);
         base_keys.insert((type_str.to_string(), color_idx));
     }
     // Include extra building types (deployable ConYards etc.).
@@ -275,9 +276,10 @@ pub fn build_sprite_atlas(
         }
         let owner_str = interner.map_or("", |i| i.resolve(entity.owner));
         let type_str = interner.map_or("", |i| i.resolve(entity.type_ref));
-        let color_idx: HouseColorIndex =
-            house_colors.get(owner_str).copied()
-                .unwrap_or(crate::rules::house_colors::NO_REMAP);
+        let color_idx: HouseColorIndex = house_colors
+            .get(owner_str)
+            .copied()
+            .unwrap_or(crate::rules::house_colors::NO_REMAP);
         match entity.category {
             EntityCategory::Structure => {
                 needed.insert(ShpSpriteKey {
@@ -434,9 +436,10 @@ pub fn build_sprite_atlas(
                                 theater_ext,
                                 theater_name,
                             );
-                            if let Some(data) = candidates.iter().find_map(|c| asset_manager.get(c))
+                            if let Some(data) =
+                                candidates.iter().find_map(|c| asset_manager.get_ref(c))
                             {
-                                if let Ok(shp) = ShpFile::from_bytes(&data) {
+                                if let Ok(shp) = ShpFile::from_bytes(data) {
                                     // RA2 anim SHPs have shadow frames in second half.
                                     let real: u16 = (shp.frames.len() as u16) / 2;
                                     // Ensure we load at least loop_end frames so every
@@ -488,9 +491,10 @@ pub fn build_sprite_atlas(
                                 theater_ext,
                                 theater_name,
                             );
-                            if let Some(data) = candidates.iter().find_map(|c| asset_manager.get(c))
+                            if let Some(data) =
+                                candidates.iter().find_map(|c| asset_manager.get_ref(c))
                             {
-                                if let Ok(shp) = ShpFile::from_bytes(&data) {
+                                if let Ok(shp) = ShpFile::from_bytes(data) {
                                     let real: u16 = (shp.frames.len() as u16) / 2;
                                     // Same loop_end guard as ActiveAnim above.
                                     let count: u16 = if real >= anim.loop_end {
@@ -587,9 +591,9 @@ pub fn build_sprite_atlas(
             let image: String = art_reg.resolve_effective_image_id(type_id, &rules_image);
             let candidates: Vec<String> =
                 art_data::make_shp_candidates(Some(art_reg), &image, theater_ext, theater_name);
-            let shp_data: Option<Vec<u8>> = candidates.iter().find_map(|c| asset_manager.get(c));
+            let shp_data: Option<&[u8]> = candidates.iter().find_map(|c| asset_manager.get_ref(c));
             if let Some(data) = shp_data {
-                if let Ok(shp) = ShpFile::from_bytes(&data) {
+                if let Ok(shp) = ShpFile::from_bytes(data) {
                     // RA2 make SHPs have shadow frames in the second half — only use the first half.
                     let real_frames: u16 = (shp.frames.len() as u16) / 2;
                     let frame_count: u16 = if real_frames > 0 {
@@ -603,7 +607,7 @@ pub fn build_sprite_atlas(
                         frame_count,
                         candidates
                             .iter()
-                            .find(|c| asset_manager.get(c).is_some())
+                            .find(|c| asset_manager.get_ref(c).is_some())
                             .unwrap_or(&String::new()),
                     );
                     make_frame_counts.insert(make_key.clone(), frame_count);
@@ -666,8 +670,8 @@ pub fn build_sprite_atlas(
         for name in &effect_names {
             let lower: String = name.to_ascii_lowercase();
             let candidates: Vec<String> = vec![format!("{}.shp", lower), format!("{}.SHP", name)];
-            if let Some(data) = candidates.iter().find_map(|c| asset_manager.get(c)) {
-                if let Ok(shp) = ShpFile::from_bytes(&data) {
+            if let Some(data) = candidates.iter().find_map(|c| asset_manager.get_ref(c)) {
+                if let Ok(shp) = ShpFile::from_bytes(data) {
                     let real: u16 = (shp.frames.len() as u16) / 2;
                     let count: u16 = if real > 0 {
                         real
@@ -714,8 +718,8 @@ pub fn build_sprite_atlas(
     // Load anim.pal for world effect SHPs. Anim types (explosions, warp flashes,
     // etc.) are drawn with anim.pal, not unit.pal.
     let effect_palette: Option<Palette> = asset_manager
-        .get("anim.pal")
-        .and_then(|d| Palette::from_bytes(&d).ok());
+        .get_ref("anim.pal")
+        .and_then(|d| Palette::from_bytes(d).ok());
     if effect_palette.is_none() && !effect_type_ids.is_empty() {
         log::warn!("anim.pal not found — world effect SHPs will use unit.pal (wrong colors)");
     }
@@ -760,8 +764,7 @@ pub fn build_sprite_atlas(
         house_color: HouseColorIndex::default(),
     });
     if has_harvesters && !oregath_cached {
-        let oregath_sprites: Vec<RenderedShpSprite> =
-            render_harvest_overlay_frames(asset_manager);
+        let oregath_sprites: Vec<RenderedShpSprite> = render_harvest_overlay_frames(asset_manager);
         if !oregath_sprites.is_empty() {
             log::info!(
                 "Rendered {} oregath.shp harvest overlay frames",
@@ -932,9 +935,9 @@ fn render_shp_sprite(
     };
 
     // Try each candidate in order until one is found.
-    let mut lookup_result: Option<(Vec<u8>, String)> = None;
+    let mut lookup_result: Option<(&[u8], String)> = None;
     for name in &candidates {
-        if let Some(data) = asset_manager.get(name) {
+        if let Some(data) = asset_manager.get_ref(name) {
             lookup_result = Some((data, name.clone()));
             break;
         }
@@ -957,7 +960,7 @@ fn render_shp_sprite(
         );
     }
     log::trace!("Loaded SHP: {} ({} bytes)", found_name, shp_data.len());
-    let shp: ShpFile = match ShpFile::from_bytes(&shp_data) {
+    let shp: ShpFile = match ShpFile::from_bytes(shp_data) {
         Ok(s) => s,
         Err(e) => {
             log::warn!("Failed to parse {}: {}", found_name, e);
@@ -1094,14 +1097,14 @@ pub fn canonical_infantry_facing(facing: u8) -> u8 {
 /// At render time, the correct frame is: `facing_index * 15 + anim_frame`.
 fn render_harvest_overlay_frames(asset_manager: &AssetManager) -> Vec<RenderedShpSprite> {
     // Load effect palette (anim.pal).
-    let pal_data: Vec<u8> = match asset_manager.get("anim.pal") {
+    let pal_data: &[u8] = match asset_manager.get_ref("anim.pal") {
         Some(d) => d,
         None => {
             log::warn!("anim.pal not found — skipping harvest overlay");
             return Vec::new();
         }
     };
-    let palette: Palette = match Palette::from_bytes(&pal_data) {
+    let palette: Palette = match Palette::from_bytes(pal_data) {
         Ok(p) => p,
         Err(e) => {
             log::warn!("Failed to parse anim.pal: {} — skipping harvest overlay", e);
@@ -1110,14 +1113,14 @@ fn render_harvest_overlay_frames(asset_manager: &AssetManager) -> Vec<RenderedSh
     };
 
     // Load oregath.shp.
-    let shp_data: Vec<u8> = match asset_manager.get("oregath.shp") {
+    let shp_data: &[u8] = match asset_manager.get_ref("oregath.shp") {
         Some(d) => d,
         None => {
             log::warn!("oregath.shp not found — skipping harvest overlay");
             return Vec::new();
         }
     };
-    let shp: ShpFile = match ShpFile::from_bytes(&shp_data) {
+    let shp: ShpFile = match ShpFile::from_bytes(shp_data) {
         Ok(s) => s,
         Err(e) => {
             log::warn!(
