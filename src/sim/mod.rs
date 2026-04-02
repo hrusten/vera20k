@@ -53,6 +53,9 @@ pub mod vision;
 pub mod animation;
 pub mod bridge_state;
 
+// --- Persistent cell occupancy ---
+pub mod occupancy;
+
 // --- Passengers, transport, slaves ---
 pub mod passenger;
 pub mod slave_miner;
