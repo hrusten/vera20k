@@ -415,7 +415,7 @@ mod tests {
 
         // Tick through the entire sequence.
         for _ in 0..200 {
-            tick_tunnel_movement(&mut entities, 33, 0);
+            tick_tunnel_movement(&mut entities, &mut OccupancyGrid::new(), 33, 0);
         }
 
         // Should have arrived at destination and be back on ground.
@@ -448,7 +448,7 @@ mod tests {
 
         // Tick past DigIn into UndergroundTravel.
         for _ in 0..10 {
-            tick_tunnel_movement(&mut entities, 33, 0);
+            tick_tunnel_movement(&mut entities, &mut OccupancyGrid::new(), 33, 0);
         }
 
         let entity = entities.get(1).expect("should exist");

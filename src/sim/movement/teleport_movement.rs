@@ -411,7 +411,7 @@ mod tests {
         );
 
         // One tick relocates instantly (matches original Phase 0).
-        tick_teleport_movement(&mut entities, 33, 0);
+        tick_teleport_movement(&mut entities, &mut OccupancyGrid::new(), 33, 0);
 
         let entity = entities.get(1).expect("should exist");
         assert_eq!(entity.position.rx, 20, "Should have relocated to target");
@@ -426,7 +426,7 @@ mod tests {
         // Tick through ChronoDelay (being_warped_ticks countdown).
         let delay = ts.being_warped_ticks;
         for _ in 0..delay + 5 {
-            tick_teleport_movement(&mut entities, 33, 0);
+            tick_teleport_movement(&mut entities, &mut OccupancyGrid::new(), 33, 0);
         }
 
         // TeleportState should be removed after completion.
@@ -456,7 +456,7 @@ mod tests {
 
         // Complete the whole sequence: 1 tick for Relocate + chrono delay ticks.
         for _ in 0..200 {
-            tick_teleport_movement(&mut entities, 33, 0);
+            tick_teleport_movement(&mut entities, &mut OccupancyGrid::new(), 33, 0);
         }
 
         // Should have restored to Drive.

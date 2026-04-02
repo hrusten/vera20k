@@ -82,6 +82,41 @@ impl Default for OccupancyGrid {
 }
 
 impl OccupancyGrid {
+    /// Rebuild occupancy from scratch by scanning all entities.
+    /// Used at map load (deserialization) and for debug validation.
+    pub fn rebuild(entities: &crate::sim::entity_store::EntityStore) -> Self {
+        use crate::map::entities::EntityCategory;
+        use crate::sim::movement::locomotor::MovementLayer;
+
+        let mut grid = Self::new();
+        for entity in entities.values() {
+            // Entities inside transports don't occupy cells.
+            if entity.passenger_role.is_inside_transport() {
+                continue;
+            }
+            let layer = entity
+                .locomotor
+                .as_ref()
+                .map_or(MovementLayer::Ground, |l| l.layer);
+            // Air and underground entities are not tracked in occupancy.
+            if matches!(layer, MovementLayer::Air | MovementLayer::Underground) {
+                continue;
+            }
+            let rx = entity.position.rx;
+            let ry = entity.position.ry;
+            let sid = entity.stable_id;
+            let sub = if entity.category == EntityCategory::Infantry {
+                entity.sub_cell
+            } else {
+                None
+            };
+            grid.add(rx, ry, sid, layer, sub);
+        }
+        grid
+    }
+}
+
+impl OccupancyGrid {
     /// Create an empty occupancy grid.
     pub fn new() -> Self {
         Self {
