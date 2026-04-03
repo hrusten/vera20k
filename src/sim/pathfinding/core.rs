@@ -79,6 +79,63 @@ const NEIGHBORS: [(i32, i32, bool); 8] = [
     (-1, -1, true), // NW
 ];
 
+/// Threshold for ground vs bridge closed-list selection.
+/// Binary: abs(path_height - cell.height_level) < 2 at 0x00429e7d.
+const BRIDGE_HEIGHT_THRESHOLD: u8 = 2;
+
+/// Encode source cell index + bridge flag into came_from value.
+/// Max map = 512x512 = 262,144 cells -> fits in 18 bits, leaving bit 20 free.
+const CAME_FROM_BRIDGE: usize = 1 << 20;
+
+/// Determine whether a node at `path_height` should use the bridge closed list
+/// for a given neighbor cell. Uses the CURRENT node's height (not computed
+/// neighbor height). Matches binary inline check at 0x00429e54.
+fn is_at_bridge_level(path_height: u8, cell: &PathCell) -> bool {
+    cell.bridge_walkable && path_height.abs_diff(cell.ground_level) >= BRIDGE_HEIGHT_THRESHOLD
+}
+
+/// Compute what height a new A* node carries forward when expanding into
+/// `neighbor_cell` from a parent at `parent_height` in `parent_cell`.
+/// Matches AStar_create_node (0x0042a460) 4-case decision tree.
+fn compute_neighbor_height(
+    parent_height: u8,
+    parent_cell: &PathCell,
+    neighbor_cell: &PathCell,
+) -> u8 {
+    // Case 1: Neighbor is not a bridge cell -> ground level
+    if !neighbor_cell.bridge_walkable {
+        return neighbor_cell.ground_level;
+    }
+
+    // Case 2: Parent is also a bridge cell
+    if parent_cell.bridge_walkable {
+        if parent_height == parent_cell.bridge_deck_level {
+            // Parent was on bridge deck -> stay on bridge
+            return neighbor_cell.bridge_deck_level;
+        } else {
+            // Parent was under bridge -> stay under
+            return neighbor_cell.ground_level;
+        }
+    }
+
+    // Case 3: Parent is NOT bridge, neighbor IS bridge.
+    // Ramp-up restricted to diff in [2, 4].
+    let diff = parent_height as i16 - neighbor_cell.ground_level as i16;
+    if (2..=4).contains(&diff) {
+        neighbor_cell.bridge_deck_level
+    } else {
+        neighbor_cell.ground_level
+    }
+}
+
+fn encode_from(cell_idx: usize, on_bridge: bool) -> usize {
+    cell_idx | if on_bridge { CAME_FROM_BRIDGE } else { 0 }
+}
+
+fn decode_from(value: usize) -> (usize, bool) {
+    (value & !CAME_FROM_BRIDGE, value & CAME_FROM_BRIDGE != 0)
+}
+
 /// Check if a cell is passable for pathfinding purposes.
 ///
 /// For water movers (`MovementZone::Water` / `WaterBeach`), the normal PathGrid

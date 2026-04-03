@@ -475,6 +475,199 @@ fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
     );
 }
 
+// --- Bridge height helper tests ---
+
+#[test]
+fn test_is_at_bridge_level_no_bridge() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 0,
+    };
+    // Non-bridge cell is never "at bridge level"
+    assert!(!is_at_bridge_level(0, &cell));
+    assert!(!is_at_bridge_level(4, &cell));
+}
+
+#[test]
+fn test_is_at_bridge_level_ground_near() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // path_height=0, ground=0 -> diff=0 < 2 -> ground list
+    assert!(!is_at_bridge_level(0, &cell));
+    // path_height=1, ground=0 -> diff=1 < 2 -> ground list
+    assert!(!is_at_bridge_level(1, &cell));
+}
+
+#[test]
+fn test_is_at_bridge_level_bridge_far() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // path_height=4, ground=0 -> diff=4 >= 2 -> bridge list
+    assert!(is_at_bridge_level(4, &cell));
+    // path_height=2, ground=0 -> diff=2 >= 2 -> bridge list
+    assert!(is_at_bridge_level(2, &cell));
+}
+
+#[test]
+fn test_compute_neighbor_height_no_bridge() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 2,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 3,
+        bridge_deck_level: 0,
+    };
+    // Case 1: neighbor not bridge -> ground_level
+    assert_eq!(compute_neighbor_height(2, &parent, &neighbor), 3);
+}
+
+#[test]
+fn test_compute_neighbor_height_parent_on_bridge_deck() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 2a: parent on bridge at deck level -> stay on bridge
+    assert_eq!(compute_neighbor_height(4, &parent, &neighbor), 4);
+}
+
+#[test]
+fn test_compute_neighbor_height_parent_under_bridge() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 2b: parent on bridge cell but at ground level -> stay under
+    assert_eq!(compute_neighbor_height(0, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_compute_neighbor_height_ramp_up() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 4,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: true,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: parent not bridge, neighbor is bridge,
+    // diff = 4 - 0 = 4, in [2,4] -> ramp up to bridge deck
+    assert_eq!(compute_neighbor_height(4, &parent, &neighbor), 4);
+}
+
+#[test]
+fn test_compute_neighbor_height_pass_under() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: parent not bridge, neighbor is bridge,
+    // diff = 0 - 0 = 0, NOT in [2,4] -> pass under
+    assert_eq!(compute_neighbor_height(0, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_compute_neighbor_height_extreme_diff_no_ramp() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 8,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: true,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: diff = 8 - 0 = 8, NOT in [2,4] -> stays at ground (no ramp)
+    assert_eq!(compute_neighbor_height(8, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_encode_decode_from_ground() {
+    let encoded = encode_from(1234, false);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 1234);
+    assert!(!bridge);
+}
+
+#[test]
+fn test_encode_decode_from_bridge() {
+    let encoded = encode_from(1234, true);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 1234);
+    assert!(bridge);
+}
+
+#[test]
+fn test_encode_decode_from_max_map() {
+    // 512x512 = 262144 cells — must not collide with bridge bit (1 << 20 = 1048576)
+    let encoded = encode_from(262143, true);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 262143);
+    assert!(bridge);
+}
+
 fn make_resolved_cell(rx: u16, ry: u16) -> ResolvedTerrainCell {
     ResolvedTerrainCell {
         rx,
