@@ -136,6 +136,31 @@ fn decode_from(value: usize) -> (usize, bool) {
     (value & !CAME_FROM_BRIDGE, value & CAME_FROM_BRIDGE != 0)
 }
 
+/// Configuration for the unified A* search. All fields optional; defaults
+/// produce a bare ground-only search equivalent to the old `find_path`.
+#[derive(Default)]
+pub struct AStarOptions<'a> {
+    /// Terrain speed multipliers (cost 0 = blocked for this SpeedType).
+    pub terrain_costs: Option<&'a TerrainCostGrid>,
+    /// Hard-blocked cells on ground layer (stationary/enemy units). Goal exempt.
+    pub entity_blocks: Option<&'a BTreeSet<(u16, u16)>>,
+    /// Hard-blocked cells on bridge layer. Goal exempt.
+    pub bridge_blocks: Option<&'a BTreeSet<(u16, u16)>>,
+    /// Cells with 4x cooperative penalty (friendly movers' paths).
+    pub penalty_cells: Option<&'a BTreeSet<(u16, u16)>>,
+    /// Zone corridor restriction — only expand cells in these zones.
+    pub corridor: Option<(
+        &'a super::zone_map::ZoneMap,
+        &'a BTreeSet<super::zone_map::ZoneId>,
+    )>,
+    /// Movement zone for water mover bypass and passability matrix.
+    pub movement_zone: Option<MovementZone>,
+    /// Resolved terrain for cliff cost and water passability checks.
+    pub resolved_terrain: Option<&'a ResolvedTerrainGrid>,
+    /// Infantry units always target ground level at bridge destinations.
+    pub is_infantry: bool,
+}
+
 /// Check if a cell is passable for pathfinding purposes.
 ///
 /// For water movers (`MovementZone::Water` / `WaterBeach`), the normal PathGrid
@@ -610,6 +635,9 @@ struct AStarNode {
     /// Cell coordinates.
     x: u16,
     y: u16,
+    /// Path height at this node — used for bridge-aware routing.
+    /// Ground-only searches carry ground_level throughout.
+    height: u8,
 }
 
 impl Ord for AStarNode {
@@ -684,6 +712,7 @@ pub fn find_path(grid: &PathGrid, start: (u16, u16), goal: (u16, u16)) -> Option
         g_cost: 0,
         x: start.0,
         y: start.1,
+        height: 0,
     }));
 
     let mut nodes_evaluated: u32 = 0;
@@ -760,6 +789,7 @@ pub fn find_path(grid: &PathGrid, start: (u16, u16), goal: (u16, u16)) -> Option
                     g_cost: tentative_g,
                     x: nx,
                     y: ny,
+                    height: 0,
                 }));
             }
         }
@@ -908,6 +938,7 @@ fn find_path_with_costs_corridor_inner(
         g_cost: 0,
         x: start.0,
         y: start.1,
+        height: 0,
     }));
 
     let mut nodes_evaluated: u32 = 0;
@@ -1022,6 +1053,7 @@ fn find_path_with_costs_corridor_inner(
                     g_cost: tentative_g,
                     x: nx,
                     y: ny,
+                    height: 0,
                 }));
             }
         }
@@ -1069,6 +1101,7 @@ fn find_path_with_costs_inner(
         g_cost: 0,
         x: start.0,
         y: start.1,
+        height: 0,
     }));
 
     let mut nodes_evaluated: u32 = 0;
@@ -1181,6 +1214,7 @@ fn find_path_with_costs_inner(
                     g_cost: tentative_g,
                     x: nx,
                     y: ny,
+                    height: 0,
                 }));
             }
         }
@@ -1221,6 +1255,7 @@ fn find_path_with_entity_blocks(
         g_cost: 0,
         x: start.0,
         y: start.1,
+        height: 0,
     }));
 
     let mut nodes_evaluated: u32 = 0;
@@ -1292,6 +1327,7 @@ fn find_path_with_entity_blocks(
                     g_cost: tentative_g,
                     x: nx,
                     y: ny,
+                    height: 0,
                 }));
             }
         }
