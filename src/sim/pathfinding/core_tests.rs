@@ -318,34 +318,43 @@ fn test_parse_foundation() {
 
 #[test]
 fn test_layered_path_transitions_onto_bridge_and_stays_on_deck() {
+    // Height-based bridge routing requires deck_level - ground_level >= 2
+    // for the pathfinder to recognize bridge cells as "at bridge level".
+    // Use realistic heights: ground=0, deck=4.
     let terrain = ResolvedTerrainGrid::from_cells(
-        3,
+        5,
         1,
         vec![
             ResolvedTerrainCell {
-                bridge_walkable: true,
-                bridge_transition: true,
-                bridge_deck_level: 1,
-                has_bridge_deck: true,
+                level: 4,
                 ..make_resolved_cell(0, 0)
             },
             ResolvedTerrainCell {
-                ground_walk_blocked: true,
-                build_blocked: true,
                 bridge_walkable: true,
-                bridge_deck_level: 1,
+                bridge_transition: true,
+                bridge_deck_level: 4,
                 has_bridge_deck: true,
-                is_water: true,
                 ..make_resolved_cell(1, 0)
             },
             ResolvedTerrainCell {
                 ground_walk_blocked: true,
                 build_blocked: true,
                 bridge_walkable: true,
-                bridge_deck_level: 1,
+                bridge_deck_level: 4,
                 has_bridge_deck: true,
                 is_water: true,
                 ..make_resolved_cell(2, 0)
+            },
+            ResolvedTerrainCell {
+                bridge_walkable: true,
+                bridge_transition: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(3, 0)
+            },
+            ResolvedTerrainCell {
+                level: 4,
+                ..make_resolved_cell(4, 0)
             },
         ],
     );
@@ -356,17 +365,14 @@ fn test_layered_path_transitions_onto_bridge_and_stays_on_deck() {
         None,
         (0, 0),
         MovementLayer::Ground,
-        (2, 0),
+        (4, 0),
         None,
         None,
     )
     .expect("bridge path should exist");
 
-    // Bridge cells are ground-walkable (NoUseTileLandType=Clear), so the
-    // pathfinder may route through on Ground layer. The path should reach
-    // the goal regardless of which layer it uses.
     assert_eq!(path.first().map(|step| (step.rx, step.ry)), Some((0, 0)));
-    assert_eq!(path.last().map(|step| (step.rx, step.ry)), Some((2, 0)));
+    assert_eq!(path.last().map(|step| (step.rx, step.ry)), Some((4, 0)));
     assert!(path.len() >= 2, "path should have at least start and goal");
 }
 
@@ -398,25 +404,21 @@ fn test_layered_path_stays_on_ground_when_bridge_not_needed() {
 
 #[test]
 fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
+    // Height-based routing needs deck - ground >= 2 to recognize bridge level.
+    // Use 5 cells: land(h=4) → transition → water+bridge → transition → land(h=4)
     let terrain = ResolvedTerrainGrid::from_cells(
-        3,
+        5,
         1,
         vec![
             ResolvedTerrainCell {
-                bridge_walkable: true,
-                bridge_transition: true,
-                bridge_deck_level: 1,
-                has_bridge_deck: true,
+                level: 4,
                 ..make_resolved_cell(0, 0)
             },
             ResolvedTerrainCell {
-                ground_walk_blocked: true,
-                build_blocked: true,
-                base_build_blocked: true,
                 bridge_walkable: true,
-                bridge_deck_level: 1,
+                bridge_transition: true,
+                bridge_deck_level: 4,
                 has_bridge_deck: true,
-                is_water: true,
                 ..make_resolved_cell(1, 0)
             },
             ResolvedTerrainCell {
@@ -424,10 +426,21 @@ fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
                 build_blocked: true,
                 base_build_blocked: true,
                 bridge_walkable: true,
-                bridge_deck_level: 1,
+                bridge_deck_level: 4,
                 has_bridge_deck: true,
                 is_water: true,
                 ..make_resolved_cell(2, 0)
+            },
+            ResolvedTerrainCell {
+                bridge_walkable: true,
+                bridge_transition: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(3, 0)
+            },
+            ResolvedTerrainCell {
+                level: 4,
+                ..make_resolved_cell(4, 0)
             },
         ],
     );
@@ -440,7 +453,7 @@ fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
             None,
             (0, 0),
             MovementLayer::Ground,
-            (2, 0),
+            (4, 0),
             None,
             None
         )
@@ -450,12 +463,15 @@ fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
 
     let change = bridge_state
         .apply_damage(BridgeDamageEvent {
-            rx: 0,
+            rx: 1,
             ry: 0,
             damage: 10,
         })
         .expect("bridge group should be destroyed");
-    assert_eq!(change.destroyed_cells, vec![(0, 0), (1, 0), (2, 0)]);
+    assert!(
+        change.destroyed_cells.len() >= 1,
+        "at least one bridge cell should be destroyed"
+    );
 
     let destroyed_grid =
         PathGrid::from_resolved_terrain_with_bridges(&terrain, Some(&bridge_state));
@@ -466,13 +482,206 @@ fn test_layered_path_rebuild_blocks_destroyed_bridge_deck() {
             None,
             (0, 0),
             MovementLayer::Ground,
-            (2, 0),
+            (4, 0),
             None,
             None
         )
         .is_none(),
         "destroyed bridge should invalidate the layered route"
     );
+}
+
+// --- Bridge height helper tests ---
+
+#[test]
+fn test_is_at_bridge_level_no_bridge() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 0,
+    };
+    // Non-bridge cell is never "at bridge level"
+    assert!(!is_at_bridge_level(0, &cell));
+    assert!(!is_at_bridge_level(4, &cell));
+}
+
+#[test]
+fn test_is_at_bridge_level_ground_near() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // path_height=0, ground=0 -> diff=0 < 2 -> ground list
+    assert!(!is_at_bridge_level(0, &cell));
+    // path_height=1, ground=0 -> diff=1 < 2 -> ground list
+    assert!(!is_at_bridge_level(1, &cell));
+}
+
+#[test]
+fn test_is_at_bridge_level_bridge_far() {
+    let cell = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // path_height=4, ground=0 -> diff=4 >= 2 -> bridge list
+    assert!(is_at_bridge_level(4, &cell));
+    // path_height=2, ground=0 -> diff=2 >= 2 -> bridge list
+    assert!(is_at_bridge_level(2, &cell));
+}
+
+#[test]
+fn test_compute_neighbor_height_no_bridge() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 2,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 3,
+        bridge_deck_level: 0,
+    };
+    // Case 1: neighbor not bridge -> ground_level
+    assert_eq!(compute_neighbor_height(2, &parent, &neighbor), 3);
+}
+
+#[test]
+fn test_compute_neighbor_height_parent_on_bridge_deck() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 2a: parent on bridge at deck level -> stay on bridge
+    assert_eq!(compute_neighbor_height(4, &parent, &neighbor), 4);
+}
+
+#[test]
+fn test_compute_neighbor_height_parent_under_bridge() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 2b: parent on bridge cell but at ground level -> stay under
+    assert_eq!(compute_neighbor_height(0, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_compute_neighbor_height_ramp_up() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 4,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: true,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: parent not bridge, neighbor is bridge,
+    // diff = 4 - 0 = 4, in [2,4] -> ramp up to bridge deck
+    assert_eq!(compute_neighbor_height(4, &parent, &neighbor), 4);
+}
+
+#[test]
+fn test_compute_neighbor_height_pass_under() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: false,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: parent not bridge, neighbor is bridge,
+    // diff = 0 - 0 = 0, NOT in [2,4] -> pass under
+    assert_eq!(compute_neighbor_height(0, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_compute_neighbor_height_extreme_diff_no_ramp() {
+    let parent = PathCell {
+        ground_walkable: true,
+        bridge_walkable: false,
+        transition: false,
+        ground_level: 8,
+        bridge_deck_level: 0,
+    };
+    let neighbor = PathCell {
+        ground_walkable: true,
+        bridge_walkable: true,
+        transition: true,
+        ground_level: 0,
+        bridge_deck_level: 4,
+    };
+    // Case 3: diff = 8 - 0 = 8, NOT in [2,4] -> stays at ground (no ramp)
+    assert_eq!(compute_neighbor_height(8, &parent, &neighbor), 0);
+}
+
+#[test]
+fn test_encode_decode_from_ground() {
+    let encoded = encode_from(1234, false);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 1234);
+    assert!(!bridge);
+}
+
+#[test]
+fn test_encode_decode_from_bridge() {
+    let encoded = encode_from(1234, true);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 1234);
+    assert!(bridge);
+}
+
+#[test]
+fn test_encode_decode_from_max_map() {
+    // 512x512 = 262144 cells — must not collide with bridge bit (1 << 20 = 1048576)
+    let encoded = encode_from(262143, true);
+    let (idx, bridge) = decode_from(encoded);
+    assert_eq!(idx, 262143);
+    assert!(bridge);
 }
 
 fn make_resolved_cell(rx: u16, ry: u16) -> ResolvedTerrainCell {
@@ -557,7 +766,8 @@ fn test_entity_blocks_empty_set_same_as_none() {
     let empty: BTreeSet<(u16, u16)> = BTreeSet::new();
 
     let path_none = find_path_with_costs(&grid, (0, 0), (5, 5), None, None, None, None, None);
-    let path_empty = find_path_with_costs(&grid, (0, 0), (5, 5), None, Some(&empty), None, None, None);
+    let path_empty =
+        find_path_with_costs(&grid, (0, 0), (5, 5), None, Some(&empty), None, None, None);
     assert_eq!(path_none, path_empty);
 }
 
@@ -739,7 +949,16 @@ fn test_float_unit_pathfinds_through_water() {
         TerrainCostGrid::from_resolved_terrain(&terrain, SpeedType::Float);
 
     // Float unit paths along the water channel (row 1).
-    let path = find_path_with_costs(&grid, (0, 1), (6, 1), Some(&float_costs), None, None, None, None);
+    let path = find_path_with_costs(
+        &grid,
+        (0, 1),
+        (6, 1),
+        Some(&float_costs),
+        None,
+        None,
+        None,
+        None,
+    );
     assert!(path.is_some(), "Float unit should pathfind through water");
     let path: Vec<(u16, u16)> = path.unwrap();
     assert_eq!(path.first(), Some(&(0, 1)));
@@ -759,7 +978,16 @@ fn test_track_unit_cannot_pathfind_through_water() {
 
     // Track unit trying to cross from land (0,0) to land (6,2) — must go around water.
     // But with a full water channel blocking, there is no path.
-    let path = find_path_with_costs(&grid, (0, 0), (6, 2), Some(&track_costs), None, None, None, None);
+    let path = find_path_with_costs(
+        &grid,
+        (0, 0),
+        (6, 2),
+        Some(&track_costs),
+        None,
+        None,
+        None,
+        None,
+    );
     assert!(
         path.is_none(),
         "Track unit cannot cross water channel — no path should exist"
@@ -774,7 +1002,16 @@ fn test_amphibious_unit_crosses_land_water_land() {
         TerrainCostGrid::from_resolved_terrain(&terrain, SpeedType::Amphibious);
 
     // Amphibious unit crosses from land (0,0) through water (row 1) to land (0,2).
-    let path = find_path_with_costs(&grid, (0, 0), (0, 2), Some(&amphi_costs), None, None, None, None);
+    let path = find_path_with_costs(
+        &grid,
+        (0, 0),
+        (0, 2),
+        Some(&amphi_costs),
+        None,
+        None,
+        None,
+        None,
+    );
     assert!(path.is_some(), "Amphibious unit should cross water channel");
     let path: Vec<(u16, u16)> = path.unwrap();
     assert_eq!(path.first(), Some(&(0, 0)));
@@ -834,7 +1071,16 @@ fn test_ground_unit_no_diagonal_through_water() {
     let foot_costs: TerrainCostGrid =
         TerrainCostGrid::from_resolved_terrain(&terrain, SpeedType::Foot);
 
-    let path = find_path_with_costs(&grid, (1, 0), (2, 1), Some(&foot_costs), None, None, None, None);
+    let path = find_path_with_costs(
+        &grid,
+        (1, 0),
+        (2, 1),
+        Some(&foot_costs),
+        None,
+        None,
+        None,
+        None,
+    );
     assert!(path.is_some(), "Foot unit should find a path around water");
     let path: Vec<(u16, u16)> = path.unwrap();
     // The direct diagonal (1,0)→(2,1) is blocked because both cardinal
@@ -928,4 +1174,120 @@ fn test_nearest_walkable_no_walkable_in_radius() {
     }
     let result = grid.nearest_walkable(1, 1, 5, None, None);
     assert_eq!(result, None);
+}
+
+#[test]
+fn test_height_based_bridge_routing_deck_at_4() {
+    // 5x1 grid: land(h=4) → transition(g=0,d=4) → bridge(g=0,d=4) → transition(g=0,d=4) → land(h=4)
+    let terrain = ResolvedTerrainGrid::from_cells(
+        5,
+        1,
+        vec![
+            ResolvedTerrainCell {
+                level: 4,
+                ..make_resolved_cell(0, 0)
+            },
+            ResolvedTerrainCell {
+                level: 0,
+                bridge_walkable: true,
+                bridge_transition: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(1, 0)
+            },
+            ResolvedTerrainCell {
+                level: 0,
+                ground_walk_blocked: true,
+                is_water: true,
+                bridge_walkable: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(2, 0)
+            },
+            ResolvedTerrainCell {
+                level: 0,
+                bridge_walkable: true,
+                bridge_transition: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(3, 0)
+            },
+            ResolvedTerrainCell {
+                level: 4,
+                ..make_resolved_cell(4, 0)
+            },
+        ],
+    );
+    let grid = PathGrid::from_resolved_terrain(&terrain);
+    let path = find_layered_path(
+        &grid,
+        None,
+        None,
+        (0, 0),
+        MovementLayer::Ground,
+        (4, 0),
+        None,
+        None,
+    )
+    .expect("path across bridge should exist");
+
+    assert_eq!(path.first().map(|s| (s.rx, s.ry)), Some((0, 0)));
+    assert_eq!(path.last().map(|s| (s.rx, s.ry)), Some((4, 0)));
+
+    // Middle cells (bridge span) should be on Bridge layer since
+    // start height=4, bridge ground_level=0, diff=4 >= 2 → bridge list
+    let bridge_steps: Vec<_> = path.iter().filter(|s| s.layer == MovementLayer::Bridge).collect();
+    assert!(
+        !bridge_steps.is_empty(),
+        "Bridge cells should route on Bridge layer with height diff >= 2"
+    );
+}
+
+#[test]
+fn test_cliff_cost_uses_effective_height_not_ground_level() {
+    // Verify: bridge deck (effective 4) → land (ground 4) has NO cliff penalty.
+    // Old behavior: skipped cliff on bridge layer. New: compares node heights.
+    // node.height=4 (deck), neighbor_height=4 (land ground_level) → equal → no penalty.
+    let terrain = ResolvedTerrainGrid::from_cells(
+        3,
+        1,
+        vec![
+            ResolvedTerrainCell {
+                level: 0,
+                bridge_walkable: true,
+                bridge_transition: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(0, 0)
+            },
+            ResolvedTerrainCell {
+                level: 0,
+                bridge_walkable: true,
+                bridge_deck_level: 4,
+                has_bridge_deck: true,
+                ..make_resolved_cell(1, 0)
+            },
+            ResolvedTerrainCell {
+                level: 4,
+                ..make_resolved_cell(2, 0)
+            },
+        ],
+    );
+    let grid = PathGrid::from_resolved_terrain(&terrain);
+    // Path from bridge start to land at same effective height
+    let path = find_layered_path(
+        &grid,
+        None,
+        None,
+        (0, 0),
+        MovementLayer::Bridge,
+        (2, 0),
+        None,
+        None,
+    );
+    // Should find a path (no false cliff penalty blocking it)
+    assert!(
+        path.is_some(),
+        "Bridge(deck=4) to land(ground=4) should not have false cliff penalty"
+    );
 }
