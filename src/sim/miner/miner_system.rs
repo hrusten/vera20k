@@ -531,7 +531,7 @@ fn handle_unload(
     if snap.miner.unload_base_total > 0
         && player_has_purifier(sim, rules, sim.interner.resolve(snap.owner))
     {
-        let bonus_pct: i32 = (rules.general.purifier_bonus * 100.0) as i32;
+        let bonus_pct: i32 = rules.general.purifier_bonus_pct;
         let bonus: i32 = snap.miner.unload_base_total as i32 * bonus_pct / 100;
         let owner_str = sim.interner.resolve(snap.owner).to_string();
         let credits = credits_entry_for_owner(sim, &owner_str);

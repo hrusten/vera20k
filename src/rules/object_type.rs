@@ -630,7 +630,7 @@ impl ObjectType {
             sight: section.get_i32("Sight").unwrap_or(0),
             tech_level: section.get_i32("TechLevel").unwrap_or(-1),
             build_time_multiplier: btm_f32,
-            build_time_multiplier_x1000: (btm_f32.max(0.01) as f64 * 1000.0) as u64,
+            build_time_multiplier_x1000: (btm_f32.max(0.01) as f64 * 1000.0).round() as u64,
             owner,
             required_houses,
             forbidden_houses,

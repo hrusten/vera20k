@@ -301,7 +301,7 @@ fn handle_slave_deposit(
 
     // Ore Purifier bonus applies to slave deposits too.
     if player_has_purifier(sim, rules, sim.interner.resolve(snap.owner)) {
-        let bonus_pct: i32 = (rules.general.purifier_bonus * 100.0) as i32;
+        let bonus_pct: i32 = rules.general.purifier_bonus_pct;
         value += value * bonus_pct / 100;
     }
 
