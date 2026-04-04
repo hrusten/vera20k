@@ -144,14 +144,10 @@ pub struct ZoneMap {
     /// TODO(RE): RA2/YR does not store zone IDs directly per cell. Each cell carries
     /// a nodeIndex, and each MovementZone has its own zoneIdByNodeIndex table.
     zone_ids: Vec<ZoneId>,
-    /// Optional bridge-layer zone IDs (same index space, continuation of zone_count).
-    ///
-    /// TODO(RE): Bridge-layer zone queries in the original engine go through the
-    /// onBridge flag plus ZoneConnection remap records near the cell, not a standalone
-    /// bridge zone grid. The recovered gate/record helpers now live in
-    /// `sim::bridge_specs`, but the live runtime still lacks stored ZoneConnection
-    /// records and bridge-remap integration.
-    bridge_zone_ids: Option<Vec<ZoneId>>,
+    /// Per-cell bridge redirect: for bridge cells, the ground endpoint cell
+    /// whose zone ID should be returned for bridge-layer queries.
+    /// None = no bridges on map. Mirrors gamemd.exe GetZoneID redirect (0x0056d230).
+    bridge_redirect: Option<Vec<Option<(u16, u16)>>>,
     pub width: u16,
     pub height: u16,
     /// Number of distinct zones (ground + bridge combined).
@@ -164,7 +160,7 @@ impl ZoneMap {
     /// Construct a ZoneMap from pre-computed arrays.
     pub(crate) fn new(
         zone_ids: Vec<ZoneId>,
-        bridge_zone_ids: Option<Vec<ZoneId>>,
+        bridge_redirect: Option<Vec<Option<(u16, u16)>>>,
         width: u16,
         height: u16,
         zone_count: u16,
@@ -172,7 +168,7 @@ impl ZoneMap {
     ) -> Self {
         Self {
             zone_ids,
-            bridge_zone_ids,
+            bridge_redirect,
             width,
             height,
             zone_count,
@@ -181,17 +177,25 @@ impl ZoneMap {
     }
 
     /// Look up the zone ID for a cell at the given layer.
+    ///
+    /// For bridge-layer queries, returns the ground zone of the nearest bridge
+    /// endpoint. This mirrors gamemd.exe GetZoneID bridge redirect (0x0056d230).
+    /// If no bridge endpoint record covers this cell, returns ZONE_INVALID.
     pub fn zone_at(&self, x: u16, y: u16, layer: MovementLayer) -> ZoneId {
         if x >= self.width || y >= self.height {
             return ZONE_INVALID;
         }
         let idx = y as usize * self.width as usize + x as usize;
         match layer {
-            MovementLayer::Bridge => self
-                .bridge_zone_ids
-                .as_ref()
-                .map(|bz| bz[idx])
-                .unwrap_or(ZONE_INVALID),
+            MovementLayer::Bridge => {
+                if let Some(redirect) = &self.bridge_redirect {
+                    if let Some(Some((ex, ey))) = redirect.get(idx) {
+                        let e_idx = *ey as usize * self.width as usize + *ex as usize;
+                        return self.zone_ids.get(e_idx).copied().unwrap_or(ZONE_INVALID);
+                    }
+                }
+                ZONE_INVALID
+            }
             _ => self.zone_ids[idx],
         }
     }
@@ -216,19 +220,14 @@ impl ZoneMap {
         &self.zone_ids
     }
 
-    /// Immutable access to the bridge-layer zone ID array.
-    pub(crate) fn bridge_zone_ids_slice(&self) -> Option<&[ZoneId]> {
-        self.bridge_zone_ids.as_deref()
-    }
-
     /// Mutable access to the ground-layer zone ID array.
     pub(crate) fn zone_ids_mut(&mut self) -> &mut Vec<ZoneId> {
         &mut self.zone_ids
     }
 
-    /// Mutable access to the bridge-layer zone ID array.
-    pub(crate) fn bridge_zone_ids_mut(&mut self) -> Option<&mut Vec<ZoneId>> {
-        self.bridge_zone_ids.as_mut()
+    /// Replace the bridge redirect table (e.g. after incremental recomputation).
+    pub(crate) fn set_bridge_redirect(&mut self, redirect: Option<Vec<Option<(u16, u16)>>>) {
+        self.bridge_redirect = redirect;
     }
 
     /// Update zone_count (e.g. after incremental zone assignment).
@@ -295,14 +294,17 @@ impl ZoneGrid {
         width: u16,
         height: u16,
     ) -> Self {
-        Self::build_with_terrain(path_grid, terrain_costs, None, width, height)
+        Self::build_with_terrain(path_grid, terrain_costs, None, &[], width, height)
     }
 
     /// Build zone maps using resolved terrain passability when available.
+    /// Bridge endpoint records inject cross-bridge adjacency edges for
+    /// land-capable categories (Land, Infantry, Amphibious).
     pub fn build_with_terrain(
         path_grid: &PathGrid,
         terrain_costs: &BTreeMap<SpeedType, TerrainCostGrid>,
         resolved_terrain: Option<&ResolvedTerrainGrid>,
+        bridge_records: &[crate::sim::bridge_state::BridgeEndpointRecord],
         width: u16,
         height: u16,
     ) -> Self {
@@ -314,7 +316,7 @@ impl ZoneGrid {
             let speed_type = cat.representative_speed_type();
             let cost_grid = terrain_costs.get(&speed_type);
 
-            let (zone_map, adj) = zone_build::build_zone_map_with_terrain(
+            let (mut zone_map, mut adj) = zone_build::build_zone_map_with_terrain(
                 path_grid,
                 cost_grid,
                 resolved_terrain,
@@ -322,6 +324,26 @@ impl ZoneGrid {
                 width,
                 height,
             );
+
+            // Inject bridge adjacency and redirect for land-capable categories.
+            if matches!(
+                cat,
+                ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
+            ) {
+                zone_build::inject_bridge_adjacency(
+                    &mut adj,
+                    zone_map.zone_ids_slice(),
+                    bridge_records,
+                    width,
+                );
+                zone_map.set_bridge_redirect(zone_build::build_bridge_redirect(
+                    path_grid,
+                    bridge_records,
+                    width,
+                    height,
+                ));
+            }
+
             let sz = SuperZoneMap::from_adjacency(&adj, zone_map.zone_count);
             super_zones.insert(cat, sz);
             maps.insert(cat, zone_map);

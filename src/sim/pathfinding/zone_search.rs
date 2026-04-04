@@ -207,12 +207,8 @@ pub fn find_path_zoned(
 /// Zone-aware path search for layered (bridge-capable) paths.
 ///
 /// Checks zone connectivity before invoking the layered A* pathfinder.
-/// Corridor restriction is not applied to layered paths because the current
-/// bridge-zone model is still conservative.
-///
-/// TODO(RE): The stock game's bridge-layer zone query uses onBridge state plus
-/// ZoneConnection remap records near the cell, not the standalone bridge grid
-/// that this pathfinder currently uses for fast rejects.
+/// Bridge cells redirect to ground endpoint zones via `zone_at(Bridge)`,
+/// so a single ground-layer reachability check covers cross-bridge paths.
 pub fn find_layered_path_zoned(
     grid: &PathGrid,
     ground_blocks: Option<&BTreeSet<(u16, u16)>>,
@@ -239,15 +235,12 @@ pub fn find_layered_path_zoned(
         );
     }
 
-    // Zone pre-check for layered paths.
+    // Zone pre-check: bridge cells redirect to ground endpoint zones,
+    // so a single ground-layer check covers cross-bridge reachability.
     if let Some(zg) = zone_grid {
-        let ground_reachable =
-            zg.can_reach(zone_cat, start, start_layer, goal, MovementLayer::Ground);
-        let bridge_reachable =
-            zg.can_reach(zone_cat, start, start_layer, goal, MovementLayer::Bridge);
-        if !ground_reachable && !bridge_reachable {
+        if !zg.can_reach(zone_cat, start, start_layer, goal, MovementLayer::Ground) {
             log::trace!(
-                "zone_search: layered unreachable {:?} ({:?} layer={:?} → {:?}), skipping A*",
+                "zone_search: layered unreachable {:?} ({:?} layer={:?} -> {:?}), skipping A*",
                 zone_cat,
                 start,
                 start_layer,

@@ -129,50 +129,18 @@ pub(crate) fn build_zone_map_with_terrain(
         }
     }
 
-    let _ground_zone_count = next_zone - 1;
-
-    // -- Bridge layer flood-fill (if applicable) --
-    let bridge_zone_ids = if matches!(
-        cat,
-        ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
-    ) {
-        let mut bz = vec![ZONE_INVALID; total];
-        let mut any_bridge = false;
-        for ry in 0..height {
-            for rx in 0..width {
-                let idx = ry as usize * width as usize + rx as usize;
-                if bz[idx] != ZONE_INVALID {
-                    continue;
-                }
-                if !path_grid.is_walkable_on_layer(rx, ry, MovementLayer::Bridge) {
-                    continue;
-                }
-                flood_fill_bridge(rx, ry, next_zone, &mut bz, width, height, path_grid);
-                next_zone += 1;
-                any_bridge = true;
-            }
-        }
-        if any_bridge { Some(bz) } else { None }
-    } else {
-        None
-    };
-
     let zone_count = next_zone - 1;
 
-    // -- Extract adjacency --
+    // -- Extract adjacency (ground only; bridge edges injected by caller) --
     let adj = extract_adjacency(
         &zone_ids,
-        bridge_zone_ids.as_deref(),
-        path_grid,
         width,
         height,
         zone_count,
     );
 
-    // Compute zone centroids from cell assignments.
     let zone_info = compute_zone_info(
         &zone_ids,
-        bridge_zone_ids.as_deref(),
         width,
         height,
         zone_count,
@@ -180,7 +148,7 @@ pub(crate) fn build_zone_map_with_terrain(
 
     let zone_map = ZoneMap::new(
         zone_ids,
-        bridge_zone_ids,
+        None, // bridge_redirect set by caller
         width,
         height,
         zone_count,
@@ -215,62 +183,23 @@ fn build_zone_map_with_movement_classes(
         &node_adj,
         movement_zone,
     );
-    let (zone_ids, ground_zone_count) = compact_raw_zone_ids(&node_indices, &raw_zone_ids, total);
-
-    // TODO(RE): Ground-layer zone IDs now follow the recovered nodeIndex -> zoneId table shape,
-    // but bridge lookups still use the older standalone bridge flood-fill. Real RA2/YR routes
-    // bridge-layer zone queries through onBridge state plus ZoneConnection remap records.
-    let bridge_zone_ids = if matches!(
-        cat,
-        ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
-    ) {
-        let mut bz = vec![ZONE_INVALID; total];
-        let mut next_zone = ground_zone_count + 1;
-        let mut any_bridge = false;
-        for ry in 0..height {
-            for rx in 0..width {
-                let idx = ry as usize * width as usize + rx as usize;
-                if bz[idx] != ZONE_INVALID {
-                    continue;
-                }
-                if !path_grid.is_walkable_on_layer(rx, ry, MovementLayer::Bridge) {
-                    continue;
-                }
-                flood_fill_bridge(rx, ry, next_zone, &mut bz, width, height, path_grid);
-                next_zone += 1;
-                any_bridge = true;
-            }
-        }
-        if any_bridge { Some(bz) } else { None }
-    } else {
-        None
-    };
-
-    let mut zone_count = ground_zone_count;
-    if let Some(bridge_ids) = &bridge_zone_ids {
-        if let Some(max_bridge) = bridge_ids.iter().copied().max() {
-            zone_count = zone_count.max(max_bridge);
-        }
-    }
+    let (zone_ids, zone_count) = compact_raw_zone_ids(&node_indices, &raw_zone_ids, total);
 
     let adj = extract_adjacency(
         &zone_ids,
-        bridge_zone_ids.as_deref(),
-        path_grid,
         width,
         height,
         zone_count,
     );
     let zone_info = compute_zone_info(
         &zone_ids,
-        bridge_zone_ids.as_deref(),
         width,
         height,
         zone_count,
     );
     let zone_map = ZoneMap::new(
         zone_ids,
-        bridge_zone_ids,
+        None, // bridge_redirect set by caller
         width,
         height,
         zone_count,
@@ -647,67 +576,14 @@ pub(crate) fn flood_fill(
     }
 }
 
-/// BFS flood-fill on the bridge layer.
-pub(crate) fn flood_fill_bridge(
-    start_x: u16,
-    start_y: u16,
-    zone_id: ZoneId,
-    zone_ids: &mut [ZoneId],
-    width: u16,
-    height: u16,
-    path_grid: &PathGrid,
-) {
-    let mut queue = VecDeque::new();
-    let start_idx = start_y as usize * width as usize + start_x as usize;
-    zone_ids[start_idx] = zone_id;
-    queue.push_back((start_x, start_y));
-
-    while let Some((cx, cy)) = queue.pop_front() {
-        for &(dx, dy, is_diagonal) in &NEIGHBORS {
-            let nx = cx as i32 + dx;
-            let ny = cy as i32 + dy;
-            if nx < 0 || ny < 0 || nx >= width as i32 || ny >= height as i32 {
-                continue;
-            }
-            let nx = nx as u16;
-            let ny = ny as u16;
-            let n_idx = ny as usize * width as usize + nx as usize;
-
-            if zone_ids[n_idx] != ZONE_INVALID {
-                continue;
-            }
-            if !path_grid.is_walkable_on_layer(nx, ny, MovementLayer::Bridge) {
-                continue;
-            }
-
-            // Diagonal corner-cutting on bridge layer.
-            if is_diagonal {
-                let ax = (cx as i32 + dx) as u16;
-                let bx = cx;
-                let by = (cy as i32 + dy) as u16;
-                if !path_grid.is_walkable_on_layer(ax, cy, MovementLayer::Bridge)
-                    || !path_grid.is_walkable_on_layer(bx, by, MovementLayer::Bridge)
-                {
-                    continue;
-                }
-            }
-
-            zone_ids[n_idx] = zone_id;
-            queue.push_back((nx, ny));
-        }
-    }
-}
-
-/// Compute per-zone centroid and cell count from the zone ID arrays.
+/// Compute per-zone centroid and cell count from the ground zone ID array.
 pub(crate) fn compute_zone_info(
     zone_ids: &[ZoneId],
-    bridge_zone_ids: Option<&[ZoneId]>,
     width: u16,
     _height: u16,
     zone_count: u16,
 ) -> Vec<ZoneInfo> {
     let mut sums: Vec<(u64, u64, u32)> = vec![(0, 0, 0); zone_count as usize];
-    // Accumulate from ground layer.
     for (idx, &zid) in zone_ids.iter().enumerate() {
         if zid != ZONE_INVALID {
             let x = (idx % width as usize) as u64;
@@ -716,19 +592,6 @@ pub(crate) fn compute_zone_info(
             entry.0 += x;
             entry.1 += y;
             entry.2 += 1;
-        }
-    }
-    // Accumulate from bridge layer.
-    if let Some(bz) = bridge_zone_ids {
-        for (idx, &zid) in bz.iter().enumerate() {
-            if zid != ZONE_INVALID {
-                let x = (idx % width as usize) as u64;
-                let y = (idx / width as usize) as u64;
-                let entry = &mut sums[zid as usize - 1];
-                entry.0 += x;
-                entry.1 += y;
-                entry.2 += 1;
-            }
         }
     }
     sums.iter()
@@ -748,22 +611,18 @@ pub(crate) fn compute_zone_info(
         .collect()
 }
 
-/// Extract adjacency from zone ID arrays. Also creates edges between ground
-/// and bridge zones at transition cells.
+/// Extract adjacency from ground zone ID array (ground-layer only).
+///
+/// Bridge cross-zone edges are injected separately via `inject_bridge_adjacency`.
 pub(crate) fn extract_adjacency(
     ground_zones: &[ZoneId],
-    bridge_zones: Option<&[ZoneId]>,
-    path_grid: &PathGrid,
     width: u16,
     height: u16,
     zone_count: u16,
 ) -> ZoneAdjacency {
-    // neighbors[z] = set of adjacent zone IDs for zone z.
     let mut adj_sets: Vec<Vec<ZoneId>> = vec![Vec::new(); zone_count as usize + 1];
-
     let w = width as usize;
 
-    // Scan all cells for ground-layer adjacency.
     for ry in 0..height {
         for rx in 0..width {
             let idx = ry as usize * w + rx as usize;
@@ -771,8 +630,6 @@ pub(crate) fn extract_adjacency(
             if z == ZONE_INVALID {
                 continue;
             }
-
-            // Check right and down neighbors (avoids double-counting).
             for &(dx, dy) in &[(1i32, 0i32), (0, 1), (1, 1), (1, -1)] {
                 let nx = rx as i32 + dx;
                 let ny = ry as i32 + dy;
@@ -788,46 +645,111 @@ pub(crate) fn extract_adjacency(
         }
     }
 
-    // Bridge-layer adjacency.
-    if let Some(bz) = bridge_zones {
-        for ry in 0..height {
-            for rx in 0..width {
-                let idx = ry as usize * w + rx as usize;
-                let z = bz[idx];
-                if z == ZONE_INVALID {
-                    continue;
-                }
-                for &(dx, dy) in &[(1i32, 0i32), (0, 1), (1, 1), (1, -1)] {
-                    let nx = rx as i32 + dx;
-                    let ny = ry as i32 + dy;
-                    if nx < 0 || ny < 0 || nx >= width as i32 || ny >= height as i32 {
-                        continue;
-                    }
-                    let n_idx = ny as usize * w + nx as usize;
-                    let nz = bz[n_idx];
-                    if nz != ZONE_INVALID && nz != z {
-                        add_adjacency(&mut adj_sets, z, nz);
-                    }
-                }
-
-                // Transition edge: bridge zone <-> ground zone at transition cells.
-                if path_grid.is_transition(rx, ry) {
-                    let gz = ground_zones[idx];
-                    if gz != ZONE_INVALID && z != gz {
-                        add_adjacency(&mut adj_sets, z, gz);
-                    }
-                }
-            }
-        }
-    }
-
-    // Sort and dedup all neighbor lists for determinism and binary search.
     for list in &mut adj_sets {
         list.sort_unstable();
         list.dedup();
     }
 
     ZoneAdjacency::new(adj_sets)
+}
+
+/// Inject bridge adjacency edges into an existing adjacency graph.
+///
+/// For each active bridge endpoint record, connects the ground zones at
+/// endpoint_a and endpoint_b. This mirrors gamemd.exe AddBridgeZoneEdges
+/// (0x005851b0) which adds bidirectional edges to the zone graph.
+pub(crate) fn inject_bridge_adjacency(
+    adj: &mut ZoneAdjacency,
+    ground_zones: &[ZoneId],
+    bridge_records: &[crate::sim::bridge_state::BridgeEndpointRecord],
+    width: u16,
+) {
+    let w = width as usize;
+    for record in bridge_records {
+        if !record.active {
+            continue;
+        }
+        let (ax, ay) = record.endpoint_a;
+        let (bx, by) = record.endpoint_b;
+
+        let a_idx = ay as usize * w + ax as usize;
+        let b_idx = by as usize * w + bx as usize;
+
+        if a_idx >= ground_zones.len() || b_idx >= ground_zones.len() {
+            continue;
+        }
+
+        let za = ground_zones[a_idx];
+        let zb = ground_zones[b_idx];
+
+        if za != ZONE_INVALID && zb != ZONE_INVALID && za != zb {
+            if !adj.neighbors[za as usize].contains(&zb) {
+                adj.neighbors[za as usize].push(zb);
+                adj.neighbors[za as usize].sort_unstable();
+            }
+            if !adj.neighbors[zb as usize].contains(&za) {
+                adj.neighbors[zb as usize].push(za);
+                adj.neighbors[zb as usize].sort_unstable();
+            }
+        }
+    }
+}
+
+/// Build per-cell bridge redirect table.
+///
+/// For each bridge cell (walkable on bridge layer), find the nearest active
+/// bridge endpoint and store its ground cell coordinates.
+pub(crate) fn build_bridge_redirect(
+    path_grid: &PathGrid,
+    bridge_records: &[crate::sim::bridge_state::BridgeEndpointRecord],
+    width: u16,
+    height: u16,
+) -> Option<Vec<Option<(u16, u16)>>> {
+    if bridge_records.is_empty() {
+        return None;
+    }
+
+    let total = width as usize * height as usize;
+    let mut redirect: Vec<Option<(u16, u16)>> = vec![None; total];
+    let mut any = false;
+
+    for ry in 0..height {
+        for rx in 0..width {
+            if !path_grid.is_walkable_on_layer(rx, ry, MovementLayer::Bridge) {
+                continue;
+            }
+
+            let mut best_endpoint: Option<(u16, u16)> = None;
+            let mut best_dist = u32::MAX;
+
+            for record in bridge_records {
+                if !record.active {
+                    continue;
+                }
+                let da = (rx as i32 - record.endpoint_a.0 as i32).unsigned_abs()
+                    + (ry as i32 - record.endpoint_a.1 as i32).unsigned_abs();
+                let db = (rx as i32 - record.endpoint_b.0 as i32).unsigned_abs()
+                    + (ry as i32 - record.endpoint_b.1 as i32).unsigned_abs();
+                let closer = if da <= db {
+                    (record.endpoint_a, da)
+                } else {
+                    (record.endpoint_b, db)
+                };
+                if closer.1 < best_dist {
+                    best_dist = closer.1;
+                    best_endpoint = Some(closer.0);
+                }
+            }
+
+            if let Some(ep) = best_endpoint {
+                let idx = ry as usize * width as usize + rx as usize;
+                redirect[idx] = Some(ep);
+                any = true;
+            }
+        }
+    }
+
+    if any { Some(redirect) } else { None }
 }
 
 /// Add a bidirectional adjacency edge (avoids duplicates via sorted dedup later).

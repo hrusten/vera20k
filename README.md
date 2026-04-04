@@ -4,9 +4,7 @@
 
 Red Alert 2: Yuri's Revenge — rebuilt from scratch in Rust for large multiplayer battles.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4jTp4VcdY)
-
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4jTp4VcdY)![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)
 
 Those who contribute the most get to decide the most. As long as it aligns with projects vision described below.
 

@@ -568,6 +568,7 @@ impl Simulation {
                     path_grid,
                     &self.terrain_costs,
                     self.resolved_terrain.as_ref(),
+                    self.bridge_state.as_ref().map(|bs| bs.endpoint_records()).unwrap_or(&[]),
                 ) {
                     log::trace!("zone: incremental update ({} cells changed)", changed.len(),);
                     self.prev_path_grid = Some(path_grid.clone());
@@ -581,6 +582,7 @@ impl Simulation {
             path_grid,
             &self.terrain_costs,
             self.resolved_terrain.as_ref(),
+            self.bridge_state.as_ref().map(|bs| bs.endpoint_records()).unwrap_or(&[]),
             width,
             height,
         ));
