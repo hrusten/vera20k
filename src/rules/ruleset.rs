@@ -215,9 +215,10 @@ pub struct GeneralRules {
     /// Frames per StepTimer increment during ore gathering (HarvesterLoadRate=).
     /// One bale requires 9 steps, so harvest_interval = rate * 9. Default 2.
     pub harvester_load_rate: i32,
-    /// Minutes per bale during refinery unloading (HarvesterDumpRate=).
-    /// Converted to frames: rate * 900.0. Default 0.016 (= 14.4 frames/bale).
-    pub harvester_dump_rate: f32,
+    /// Frames per bale during refinery unloading (HarvesterDumpRate=).
+    /// Pre-computed from INI float: `clamp(rate * 900.0, 0, 255) as u8`.
+    /// Default 14 (from 0.016 * 900 = 14.4, truncated).
+    pub harvester_dump_frames: u8,
 
     // -- Chrono warp delay constants --
     /// Post-warp lock duration in game frames (ChronoDelay= in [General]).
@@ -239,10 +240,9 @@ pub struct GeneralRules {
     /// (ChronoRangeMinimum= in [General]). Default 0.
     pub chrono_range_minimum: i32,
 
-    /// Ore Purifier bonus as a fraction (PurifierBonus= in [General]).
-    /// When a player owns an Ore Purifier building, all ore gains this bonus.
-    /// 0.25 = 25% bonus. Default 0.25.
-    pub purifier_bonus: f32,
+    /// Ore Purifier bonus as integer percentage (PurifierBonus= in [General]).
+    /// Stored as `round(float_value * 100)`. 25 = 25% bonus. Default 25.
+    pub purifier_bonus_pct: i32,
 
     // -- Survivor spawning on sell/destroy --
     /// Divisor to compute survivor count for Allied buildings (AlliedSurvivorDivisor= in [General]).
@@ -385,14 +385,14 @@ impl Default for GeneralRules {
             harvester_too_far_distance: 5,
             chrono_harv_too_far_distance: 50,
             harvester_load_rate: 2,
-            harvester_dump_rate: 0.016,
+            harvester_dump_frames: 14,
             chrono_delay: 60,
             chrono_reinf_delay: 180,
             chrono_distance_factor: 48,
             chrono_trigger: true,
             chrono_minimum_delay: 16,
             chrono_range_minimum: 0,
-            purifier_bonus: 0.25,
+            purifier_bonus_pct: 25,
             allied_survivor_divisor: 500,
             soviet_survivor_divisor: 250,
             third_survivor_divisor: 750,
@@ -621,14 +621,17 @@ impl GeneralRules {
             harvester_too_far_distance: general.get_i32("HarvesterTooFarDistance").unwrap_or(5),
             chrono_harv_too_far_distance: general.get_i32("ChronoHarvTooFarDistance").unwrap_or(50),
             harvester_load_rate: general.get_i32("HarvesterLoadRate").unwrap_or(2),
-            harvester_dump_rate: general.get_f32("HarvesterDumpRate").unwrap_or(0.016),
+            harvester_dump_frames: {
+                let rate = general.get_f32("HarvesterDumpRate").unwrap_or(0.016);
+                (rate * 900.0).clamp(0.0, 255.0) as u8
+            },
             chrono_delay: general.get_i32("ChronoDelay").unwrap_or(60),
             chrono_reinf_delay: general.get_i32("ChronoReinfDelay").unwrap_or(180),
             chrono_distance_factor: general.get_i32("ChronoDistanceFactor").unwrap_or(48),
             chrono_trigger: general.get_bool("ChronoTrigger").unwrap_or(true),
             chrono_minimum_delay: general.get_i32("ChronoMinimumDelay").unwrap_or(16),
             chrono_range_minimum: general.get_i32("ChronoRangeMinimum").unwrap_or(0),
-            purifier_bonus: general.get_percent("PurifierBonus").unwrap_or(0.25),
+            purifier_bonus_pct: (general.get_percent("PurifierBonus").unwrap_or(0.25) * 100.0).round() as i32,
             allied_survivor_divisor: general.get_i32("AlliedSurvivorDivisor").unwrap_or(500),
             soviet_survivor_divisor: general.get_i32("SovietSurvivorDivisor").unwrap_or(250),
             third_survivor_divisor: general.get_i32("ThirdSurvivorDivisor").unwrap_or(750),
@@ -770,7 +773,7 @@ impl ProductionRules {
             low_power_penalty_modifier_ppm: f32_to_ppm(lpp, 0.0),
             min_low_power_production_speed_ppm: f32_to_ppm(min_lp, 0.0),
             max_low_power_production_speed_ppm: f32_to_ppm(max_lp.max(min_lp), 0.0),
-            build_speed_x1000: (bs.max(0.01) as f64 * 1000.0) as u64,
+            build_speed_x1000: (bs.max(0.01) as f64 * 1000.0).round() as u64,
             wall_build_speed_coefficient: wall_coeff,
         };
         log::info!(
@@ -1569,7 +1572,7 @@ CellSpread=0
         assert_eq!(rules.general.slave_miner_kick_frame_delay, 200);
         assert_eq!(rules.general.harvester_too_far_distance, 8);
         assert_eq!(rules.general.chrono_harv_too_far_distance, 40);
-        assert!((rules.general.purifier_bonus - 0.30).abs() < 0.001);
+        assert_eq!(rules.general.purifier_bonus_pct, 30);
     }
 
     #[test]
@@ -1591,7 +1594,7 @@ CellSpread=0
         assert_eq!(rules.general.slave_miner_kick_frame_delay, 150);
         assert_eq!(rules.general.harvester_too_far_distance, 5);
         assert_eq!(rules.general.chrono_harv_too_far_distance, 50);
-        assert!((rules.general.purifier_bonus - 0.25).abs() < 0.001);
+        assert_eq!(rules.general.purifier_bonus_pct, 25);
     }
 
     #[test]

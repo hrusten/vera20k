@@ -294,8 +294,6 @@ pub(super) fn is_production_factory(
 }
 
 const RA2_QUEUE_FRAME_MS: u64 = 66;
-const RA2_BUILD_SPEED_TICK_SCALE: f64 = 0.9;
-
 #[inline]
 fn trunc_to_i32(value: f64) -> i32 {
     value.trunc() as i32
@@ -308,20 +306,19 @@ pub(in crate::sim) fn build_time_base_frames(
     if obj.cost <= 0 {
         return 0;
     }
-    // RE-proven base path:
-    //   baseValue = trunc(cost * BuildSpeed * 0.9)
-    //   rawFrames = trunc(baseValue * typeBuildTimeMult) then
-    //   trunc(rawFrames * technoTypeBuildTimeMult)
+    // Integer-only build-time calculation (replaces f64 chain for determinism):
+    //   base = trunc(cost * BuildSpeed * 0.9)
+    //   frames = trunc(base * BuildTimeMultiplier)
     //
-    // The local sim does not yet model the separate house/type build-time
-    // multiplier helper, so that term stays at 1.0 here and the per-object
-    // `BuildTimeMultiplier` remains the only type-specific multiplier.
-    let base_value = trunc_to_i32(
-        obj.cost.max(0) as f64
-            * rules.production.build_speed.max(0.0) as f64
-            * RA2_BUILD_SPEED_TICK_SCALE,
-    );
-    let raw_frames = trunc_to_i32(base_value as f64 * obj.build_time_multiplier as f64).max(0);
+    // Using x1000 pre-scaled integers: cost * speed_x1000 * 9 / 10000
+    // then frames = base * btm_x1000 / 1000
+    //
+    // Use i64 to prevent overflow (cost up to ~50000, speed_x1000 up to ~500).
+    let cost = obj.cost.max(0) as i64;
+    let speed_x1000 = rules.production.build_speed_x1000.max(1) as i64;
+    let base_value = (cost * speed_x1000 * 9 / 10000) as i32;
+    let btm_x1000 = obj.build_time_multiplier_x1000.max(1) as i64;
+    let raw_frames = (base_value as i64 * btm_x1000 / 1000).max(0) as i32;
     raw_frames as u32
 }
 
@@ -573,4 +570,58 @@ pub fn foundation_dimensions(foundation: &str) -> (u16, u16) {
         .and_then(|value| value.trim().parse::<u16>().ok())
         .unwrap_or(1);
     (width.max(1), height.max(1))
+}
+
+#[cfg(test)]
+mod build_time_integer_tests {
+    use super::*;
+    use crate::rules::ini_parser::IniFile;
+    use crate::rules::ruleset::RuleSet;
+
+    fn rules_with_units(speed: &str) -> RuleSet {
+        let ini = IniFile::from_str(&format!(
+            "[General]\nBuildSpeed={speed}\n\
+             [InfantryTypes]\n[AircraftTypes]\n[BuildingTypes]\n\
+             [VehicleTypes]\n0=GRIZZLY\n1=PRISM\n2=CHEAP\n3=STANDARD\n\
+             [GRIZZLY]\nCost=700\nStrength=100\nArmor=heavy\n\
+             [PRISM]\nCost=1500\nStrength=100\nArmor=light\nBuildTimeMultiplier=1.15\n\
+             [CHEAP]\nCost=0\nStrength=100\nArmor=none\n\
+             [STANDARD]\nCost=1000\nStrength=100\nArmor=none\n"
+        ));
+        RuleSet::from_ini(&ini).expect("should parse")
+    }
+
+    #[test]
+    fn grizzly_tank_build_time() {
+        // cost=700, BuildSpeed=0.05, BTM=1.0
+        // Float: trunc(700*0.05*0.9) = 31. Integer: 700*50*9/10000 = 31.
+        let rules = rules_with_units("0.05");
+        let obj = rules.object("GRIZZLY").unwrap();
+        assert_eq!(build_time_base_frames(&rules, obj), 31);
+    }
+
+    #[test]
+    fn prism_tower_build_time() {
+        // cost=1500, BuildSpeed=0.05, BTM=1.15 (x1000=1150)
+        // Float: trunc(67.5)=67, trunc(67*1.15)=77. Integer: 67*1150/1000=77.
+        let rules = rules_with_units("0.05");
+        let obj = rules.object("PRISM").unwrap();
+        assert_eq!(build_time_base_frames(&rules, obj), 77);
+    }
+
+    #[test]
+    fn zero_cost_returns_zero() {
+        let rules = rules_with_units("0.05");
+        let obj = rules.object("CHEAP").unwrap();
+        assert_eq!(build_time_base_frames(&rules, obj), 0);
+    }
+
+    #[test]
+    fn existing_test_parity_buildspeed_1() {
+        // Matches production_queue_tests: cost=1000, BuildSpeed=1.0, BTM=1.0
+        // Float: trunc(1000*1.0*0.9)=900. Integer: 1000*1000*9/10000=900.
+        let rules = rules_with_units("1.0");
+        let obj = rules.object("STANDARD").unwrap();
+        assert_eq!(build_time_base_frames(&rules, obj), 900);
+    }
 }

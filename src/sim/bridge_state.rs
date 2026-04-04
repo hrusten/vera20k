@@ -33,6 +33,21 @@ pub struct BridgeRuntimeCell {
     pub bridge_group_id: Option<u16>,
 }
 
+/// A bridge's ground-level endpoint pair for zone connectivity.
+/// Each record connects two ground cells on opposite sides of a bridge.
+/// Mirrors gamemd.exe BridgeRecord at MapClass+0x54 (16 bytes each).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct BridgeEndpointRecord {
+    /// Ground cell on one side of the bridge.
+    pub endpoint_a: (u16, u16),
+    /// Ground cell on the other side of the bridge.
+    pub endpoint_b: (u16, u16),
+    /// Which bridge group this record belongs to.
+    pub group_id: u16,
+    /// Whether the bridge is traversable (false = destroyed).
+    pub active: bool,
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct BridgeRuntimeState {
     width: u16,
@@ -41,6 +56,7 @@ pub struct BridgeRuntimeState {
     group_cells: BTreeMap<u16, Vec<(u16, u16)>>,
     group_hitpoints: BTreeMap<u16, u16>,
     strength_per_group: u16,
+    endpoint_records: Vec<BridgeEndpointRecord>,
 }
 
 impl BridgeRuntimeState {
@@ -113,6 +129,8 @@ impl BridgeRuntimeState {
             group_hitpoints.insert(group_id, strength);
         }
 
+        let endpoint_records = compute_bridge_endpoints(&group_cells, terrain, width, height);
+
         Self {
             width,
             height,
@@ -120,6 +138,7 @@ impl BridgeRuntimeState {
             group_cells,
             group_hitpoints,
             strength_per_group: strength,
+            endpoint_records,
         }
     }
 
@@ -163,7 +182,18 @@ impl BridgeRuntimeState {
                 }
             }
         }
+        for record in &mut self.endpoint_records {
+            if record.group_id == group_id {
+                record.active = false;
+            }
+        }
         Some(BridgeStateChange { destroyed_cells })
+    }
+
+    /// Bridge endpoint records for zone connectivity.
+    /// Each active record connects ground zones on opposite sides of a bridge.
+    pub fn endpoint_records(&self) -> &[BridgeEndpointRecord] {
+        &self.endpoint_records
     }
 
     pub fn iter_cells(&self) -> impl Iterator<Item = ((u16, u16), &BridgeRuntimeCell)> {
@@ -181,6 +211,69 @@ impl BridgeRuntimeState {
 
 fn index_of(width: u16, height: u16, rx: u16, ry: u16) -> Option<usize> {
     (rx < width && ry < height).then_some(ry as usize * width as usize + rx as usize)
+}
+
+/// For each bridge group, find the two ground cells on opposite sides.
+///
+/// Algorithm: collect all ground cells cardinally adjacent to any bridge cell
+/// in the group, then pick the pair with maximum Manhattan distance.
+fn compute_bridge_endpoints(
+    group_cells: &BTreeMap<u16, Vec<(u16, u16)>>,
+    terrain: &ResolvedTerrainGrid,
+    width: u16,
+    height: u16,
+) -> Vec<BridgeEndpointRecord> {
+    let mut records = Vec::new();
+
+    for (&group_id, members) in group_cells {
+        // Collect ground cells adjacent to this bridge group.
+        let mut ground_neighbors: Vec<(u16, u16)> = Vec::new();
+        for &(bx, by) in members {
+            for (nx, ny) in cardinal_neighbors(bx, by, width, height) {
+                if members.contains(&(nx, ny)) {
+                    continue;
+                }
+                if let Some(cell) = terrain.cell(nx, ny) {
+                    if !cell.ground_walk_blocked && !cell.is_water
+                        && !ground_neighbors.contains(&(nx, ny))
+                    {
+                        ground_neighbors.push((nx, ny));
+                    }
+                }
+            }
+        }
+
+        if ground_neighbors.len() < 2 {
+            continue;
+        }
+
+        // Pick the pair with maximum Manhattan distance.
+        let mut best_a = ground_neighbors[0];
+        let mut best_b = ground_neighbors[1];
+        let mut best_dist: u32 = 0;
+        for i in 0..ground_neighbors.len() {
+            for j in (i + 1)..ground_neighbors.len() {
+                let (ax, ay) = ground_neighbors[i];
+                let (bx, by) = ground_neighbors[j];
+                let dist = (ax as i32 - bx as i32).unsigned_abs()
+                    + (ay as i32 - by as i32).unsigned_abs();
+                if dist > best_dist {
+                    best_dist = dist;
+                    best_a = ground_neighbors[i];
+                    best_b = ground_neighbors[j];
+                }
+            }
+        }
+
+        records.push(BridgeEndpointRecord {
+            endpoint_a: best_a,
+            endpoint_b: best_b,
+            group_id,
+            active: true,
+        });
+    }
+
+    records
 }
 
 fn cardinal_neighbors(
@@ -204,63 +297,62 @@ mod tests {
     use crate::map::resolved_terrain::{ResolvedTerrainCell, ResolvedTerrainGrid};
     use crate::rules::terrain_rules::{SpeedCostProfile, TerrainClass};
 
+    /// 5x1 grid: ground at (0,0), bridge at (1,0)-(3,0), ground at (4,0).
     fn make_bridge_terrain() -> ResolvedTerrainGrid {
         let mut cells = Vec::new();
-        for ry in 0..2u16 {
-            for rx in 0..3u16 {
-                let on_bridge = ry == 0 && rx < 2;
-                cells.push(ResolvedTerrainCell {
-                    rx,
-                    ry,
-                    source_tile_index: 0,
-                    source_sub_tile: 0,
-                    final_tile_index: 0,
-                    final_sub_tile: 0,
-                    level: 0,
-                    filled_clear: false,
-                    tileset_index: Some(0),
-                    land_type: 0,
-                    slope_type: 0,
-                    template_height: 0,
-                    render_offset_x: 0,
-                    render_offset_y: 0,
-                    terrain_class: TerrainClass::Clear,
-                    speed_costs: SpeedCostProfile::default(),
-                    is_water: false,
-                    is_cliff_like: false,
-                    is_cliff_redraw: false,
-                    variant: 0,
-                    is_rough: false,
-                    is_road: false,
-                    has_ramp: false,
-                    canonical_ramp: None,
-                    ground_walk_blocked: !on_bridge,
-                    terrain_object_blocks: false,
-                    overlay_blocks: false,
-                    base_build_blocked: false,
-                    build_blocked: on_bridge,
-                    has_bridge_deck: on_bridge,
-                    bridge_walkable: on_bridge,
-                    bridge_transition: on_bridge,
-                    bridge_deck_level: if on_bridge { 2 } else { 0 },
-                    bridge_layer: None,
-                    radar_left: [0, 0, 0],
-                    radar_right: [0, 0, 0],
-                });
-            }
+        for rx in 0..5u16 {
+            let on_bridge = (1..=3).contains(&rx);
+            cells.push(ResolvedTerrainCell {
+                rx,
+                ry: 0,
+                source_tile_index: 0,
+                source_sub_tile: 0,
+                final_tile_index: 0,
+                final_sub_tile: 0,
+                level: 0,
+                filled_clear: false,
+                tileset_index: Some(0),
+                land_type: 0,
+                slope_type: 0,
+                template_height: 0,
+                render_offset_x: 0,
+                render_offset_y: 0,
+                terrain_class: TerrainClass::Clear,
+                speed_costs: SpeedCostProfile::default(),
+                is_water: false,
+                is_cliff_like: false,
+                is_cliff_redraw: false,
+                variant: 0,
+                is_rough: false,
+                is_road: false,
+                has_ramp: false,
+                canonical_ramp: None,
+                ground_walk_blocked: on_bridge,
+                terrain_object_blocks: false,
+                overlay_blocks: false,
+                base_build_blocked: false,
+                build_blocked: on_bridge,
+                has_bridge_deck: on_bridge,
+                bridge_walkable: on_bridge,
+                bridge_transition: rx == 1 || rx == 3,
+                bridge_deck_level: if on_bridge { 4 } else { 0 },
+                bridge_layer: None,
+                radar_left: [0, 0, 0],
+                radar_right: [0, 0, 0],
+            });
         }
-        ResolvedTerrainGrid::from_cells(3, 2, cells)
+        ResolvedTerrainGrid::from_cells(5, 1, cells)
     }
 
     #[test]
     fn bridge_runtime_initializes_intact_groups() {
         let state = BridgeRuntimeState::from_resolved_terrain(&make_bridge_terrain(), true, 300);
-        let cell = state.cell(0, 0).expect("bridge cell");
+        let cell = state.cell(1, 0).expect("bridge cell");
         assert!(cell.deck_present);
         assert!(!cell.destroyed);
-        assert_eq!(cell.deck_level, 2);
+        assert_eq!(cell.deck_level, 4);
         assert_eq!(cell.bridge_group_id, Some(1));
-        assert!(state.cell(2, 1).is_none());
+        assert!(state.cell(0, 0).is_none());
     }
 
     #[test]
@@ -268,29 +360,57 @@ mod tests {
         let mut state = BridgeRuntimeState::from_resolved_terrain(&make_bridge_terrain(), true, 50);
         let change = state
             .apply_damage(BridgeDamageEvent {
-                rx: 0,
+                rx: 1,
                 ry: 0,
                 damage: 50,
             })
             .expect("bridge should be destroyed");
-        assert_eq!(change.destroyed_cells, vec![(0, 0), (1, 0)]);
-        assert!(!state.is_bridge_walkable(0, 0));
+        assert_eq!(change.destroyed_cells, vec![(1, 0), (2, 0), (3, 0)]);
         assert!(!state.is_bridge_walkable(1, 0));
+        assert!(!state.is_bridge_walkable(2, 0));
+        assert!(!state.is_bridge_walkable(3, 0));
     }
 
     #[test]
     fn indestructible_bridge_ignores_damage() {
         let mut state =
             BridgeRuntimeState::from_resolved_terrain(&make_bridge_terrain(), false, 50);
+        assert!(state
+            .apply_damage(BridgeDamageEvent {
+                rx: 1,
+                ry: 0,
+                damage: 50,
+            })
+            .is_none());
+        assert!(state.is_bridge_walkable(1, 0));
+    }
+
+    #[test]
+    fn bridge_endpoints_detected() {
+        let state = BridgeRuntimeState::from_resolved_terrain(&make_bridge_terrain(), true, 300);
+        let records = state.endpoint_records();
+        assert_eq!(records.len(), 1, "should have exactly one bridge endpoint record");
+        let rec = &records[0];
+        assert!(rec.active);
+        assert_eq!(rec.group_id, 1);
+        let endpoints = [rec.endpoint_a, rec.endpoint_b];
+        assert!(endpoints.contains(&(0, 0)), "endpoint_a or _b should be (0,0)");
+        assert!(endpoints.contains(&(4, 0)), "endpoint_a or _b should be (4,0)");
+    }
+
+    #[test]
+    fn bridge_destruction_deactivates_endpoints() {
+        let mut state = BridgeRuntimeState::from_resolved_terrain(&make_bridge_terrain(), true, 50);
+        state.apply_damage(BridgeDamageEvent {
+            rx: 1,
+            ry: 0,
+            damage: 50,
+        });
+        let records = state.endpoint_records();
+        assert!(!records.is_empty());
         assert!(
-            state
-                .apply_damage(BridgeDamageEvent {
-                    rx: 0,
-                    ry: 0,
-                    damage: 50,
-                })
-                .is_none()
+            !records[0].active,
+            "endpoint should be deactivated after destruction"
         );
-        assert!(state.is_bridge_walkable(0, 0));
     }
 }

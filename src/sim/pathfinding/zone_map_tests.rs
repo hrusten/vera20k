@@ -394,7 +394,7 @@ fn zone_grid_fly_always_reachable() {
 fn water_zone_grid_uses_resolved_land_type_directly() {
     let terrain = water_row_terrain(5);
     let grid = PathGrid::from_resolved_terrain(&terrain);
-    let zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), 5, 1);
+    let zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), &[], 5, 1);
     assert!(zg.can_reach(
         ZoneCategory::Water,
         (0, 0),
@@ -408,7 +408,7 @@ fn water_zone_grid_uses_resolved_land_type_directly() {
 fn waterbeach_zone_grid_connects_beach_to_water_with_resolved_terrain() {
     let terrain = clear_beach_water_row_terrain();
     let grid = PathGrid::from_resolved_terrain(&terrain);
-    let zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), 3, 1);
+    let zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), &[], 3, 1);
     assert!(zg.can_reach(
         ZoneCategory::WaterBeach,
         (1, 0),
@@ -544,6 +544,7 @@ fn incremental_block_cell_splits_zone() {
         &grid2,
         &BTreeMap::new(),
         None,
+        &[],
     );
     assert!(result, "Incremental update should succeed");
     assert!(
@@ -599,6 +600,7 @@ fn incremental_unblock_cell_merges_zones() {
         &grid2,
         &BTreeMap::new(),
         None,
+        &[],
     );
     assert!(result);
     assert!(
@@ -627,6 +629,7 @@ fn incremental_fallback_on_large_change() {
         &grid,
         &BTreeMap::new(),
         None,
+        &[],
     );
     assert!(
         !result,
@@ -647,6 +650,7 @@ fn incremental_no_change_is_noop() {
         &grid,
         &BTreeMap::new(),
         None,
+        &[],
     );
     assert!(result);
     assert_eq!(
@@ -659,7 +663,7 @@ fn incremental_no_change_is_noop() {
 fn incremental_with_resolved_terrain_falls_back_to_full_rebuild_path() {
     let terrain = water_row_terrain(3);
     let grid = PathGrid::from_resolved_terrain(&terrain);
-    let mut zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), 3, 1);
+    let mut zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), &[], 3, 1);
     let mut grid2 = grid.clone();
     grid2.set_blocked(1, 0, true);
     let changed = grid.diff_cells(&grid2).unwrap();
@@ -670,6 +674,7 @@ fn incremental_with_resolved_terrain_falls_back_to_full_rebuild_path() {
         &grid2,
         &BTreeMap::new(),
         Some(&terrain),
+        &[],
     );
     assert!(!result);
 }
@@ -678,7 +683,7 @@ fn incremental_with_resolved_terrain_falls_back_to_full_rebuild_path() {
 fn terrain_aware_incremental_update_requests_full_rebuild() {
     let terrain = water_row_terrain(5);
     let grid = PathGrid::from_resolved_terrain(&terrain);
-    let mut zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), 5, 1);
+    let mut zg = ZoneGrid::build_with_terrain(&grid, &BTreeMap::new(), Some(&terrain), &[], 5, 1);
 
     let result = crate::sim::pathfinding::zone_incremental::try_incremental_update(
         &mut zg,
@@ -686,6 +691,7 @@ fn terrain_aware_incremental_update_requests_full_rebuild() {
         &grid,
         &BTreeMap::new(),
         Some(&terrain),
+        &[],
     );
     assert!(
         !result,

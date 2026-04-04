@@ -135,8 +135,7 @@ fn aoe_damage_at_distance(
     // raw = base_damage * verses_pct * falloff_pct / 10000
     // Compute in i64 and clamp to i32 range to prevent silent narrowing overflow.
     let wide = base_damage as i64 * verses_pct as i64 * falloff_pct as i64 / 10000;
-    let raw: i32 = wide.clamp(0, i32::MAX as i64) as i32;
-    raw as u16
+    wide.clamp(0, u16::MAX as i64) as u16
 }
 
 #[cfg(test)]

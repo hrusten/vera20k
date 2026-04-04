@@ -35,7 +35,7 @@ fn sell_refund_for_building(
         .map(|hp| health_percent(hp.current, hp.max))
         .unwrap_or(100);
     // refund = cost * sell% * health% / 10000
-    (obj.cost.max(0) as u32 * SELL_REFUND_PERCENT * hp_pct / 10000) as i32
+    (obj.cost.max(0) as u64 * SELL_REFUND_PERCENT as u64 * hp_pct as u64 / 10000) as i32
 }
 
 /// Survivor divisor for the given owner's side, from `[General]` INI keys.

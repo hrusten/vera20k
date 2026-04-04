@@ -20,7 +20,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::PathGrid;
 use super::terrain_cost::TerrainCostGrid;
 use super::zone_build::{
-    compute_zone_info, extract_adjacency, flood_fill, flood_fill_bridge, is_passable,
+    build_bridge_redirect, compute_zone_info, extract_adjacency, flood_fill,
+    inject_bridge_adjacency, is_passable,
 };
 use super::zone_hierarchy::SuperZoneMap;
 use super::zone_map::{ZONE_INVALID, ZoneCategory, ZoneGrid, ZoneId};
@@ -47,6 +48,7 @@ pub(crate) fn try_incremental_update(
     path_grid: &PathGrid,
     terrain_costs: &BTreeMap<SpeedType, TerrainCostGrid>,
     resolved_terrain: Option<&ResolvedTerrainGrid>,
+    bridge_records: &[crate::sim::bridge_state::BridgeEndpointRecord],
 ) -> bool {
     if changed_cells.is_empty() {
         return true;
@@ -78,6 +80,7 @@ pub(crate) fn try_incremental_update(
             changed_cells,
             path_grid,
             terrain_costs,
+            bridge_records,
             width,
             height,
         ) {
@@ -96,6 +99,7 @@ fn update_category(
     changed_cells: &[(u16, u16)],
     path_grid: &PathGrid,
     terrain_costs: &BTreeMap<SpeedType, TerrainCostGrid>,
+    bridge_records: &[crate::sim::bridge_state::BridgeEndpointRecord],
     width: u16,
     height: u16,
 ) -> bool {
@@ -127,22 +131,8 @@ fn update_category(
         }
     }
 
-    // Collect affected bridge zone IDs.
-    let mut affected_bridge: BTreeSet<ZoneId> = BTreeSet::new();
-    if let Some(bridge_ids) = zone_map.bridge_zone_ids_slice() {
-        for ry in bbox_min_y..=bbox_max_y {
-            for rx in bbox_min_x..=bbox_max_x {
-                let idx = ry as usize * w + rx as usize;
-                let zid = bridge_ids[idx];
-                if zid != ZONE_INVALID {
-                    affected_bridge.insert(zid);
-                }
-            }
-        }
-    }
-
     // If no zones affected, check if newly-passable cells appeared.
-    if affected_ground.is_empty() && affected_bridge.is_empty() {
+    if affected_ground.is_empty() {
         let any_new_passable = changed_cells.iter().any(|&(cx, cy)| {
             is_passable(
                 cx,
@@ -166,14 +156,6 @@ fn update_category(
             *zid = ZONE_INVALID;
         }
     }
-    if let Some(bridge_ids) = zone_map.bridge_zone_ids_mut() {
-        for zid in bridge_ids.iter_mut() {
-            if affected_bridge.contains(zid) {
-                *zid = ZONE_INVALID;
-            }
-        }
-    }
-
     // Re-flood-fill cleared ground cells.
     let mut next_zone = zone_map.zone_count + 1;
     let ground_ids = zone_map.zone_ids_mut();
@@ -211,55 +193,49 @@ fn update_category(
         }
     }
 
-    // Re-flood-fill cleared bridge cells.
-    if matches!(
-        cat,
-        ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
-    ) {
-        if let Some(bridge_ids) = zone_map.bridge_zone_ids_mut() {
-            for ry in 0..height {
-                for rx in 0..width {
-                    let idx = ry as usize * w + rx as usize;
-                    if bridge_ids[idx] != ZONE_INVALID {
-                        continue;
-                    }
-                    if !path_grid.is_walkable_on_layer(rx, ry, MovementLayer::Bridge) {
-                        continue;
-                    }
-                    flood_fill_bridge(rx, ry, next_zone, bridge_ids, width, height, path_grid);
-                    next_zone += 1;
-                }
-            }
-        }
-    }
-
     let new_zone_count = next_zone - 1;
     zone_map.set_zone_count(new_zone_count);
 
     // --- Pass 2: Rebuild adjacency, zone_info, super-zones ---
-    // Re-borrow zone_map immutably for reading zone arrays.
     let Some(zone_map) = zone_grid.map_for(cat) else {
         return false;
     };
     let ground_slice = zone_map.zone_ids_slice();
-    let bridge_slice = zone_map.bridge_zone_ids_slice();
 
-    let new_adj = extract_adjacency(
+    let mut new_adj = extract_adjacency(
         ground_slice,
-        bridge_slice,
-        path_grid,
         width,
         height,
         new_zone_count,
     );
-    let new_info = compute_zone_info(ground_slice, bridge_slice, width, height, new_zone_count);
+
+    // Inject bridge adjacency for land-capable categories.
+    if matches!(
+        cat,
+        ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
+    ) {
+        inject_bridge_adjacency(&mut new_adj, ground_slice, bridge_records, width);
+    }
+
+    let new_info = compute_zone_info(ground_slice, width, height, new_zone_count);
     let new_sz = SuperZoneMap::from_adjacency(&new_adj, new_zone_count);
+
+    // Rebuild bridge redirect.
+    let bridge_redirect = if matches!(
+        cat,
+        ZoneCategory::Land | ZoneCategory::Infantry | ZoneCategory::Amphibious
+    ) {
+        build_bridge_redirect(path_grid, bridge_records, width, height)
+    } else {
+        None
+    };
 
     // Apply computed results back.
     let Some(zone_map) = zone_grid.map_mut(cat) else {
         return false;
     };
     zone_map.set_zone_info(new_info);
+    zone_map.set_bridge_redirect(bridge_redirect);
 
     if let Some(adj) = zone_grid.adjacency_mut(cat) {
         *adj = new_adj;

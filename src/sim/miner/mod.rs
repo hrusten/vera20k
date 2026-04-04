@@ -184,9 +184,7 @@ impl MinerConfig {
         // HarvesterLoadRate: frames per step. 9 steps per bale.
         let load_rate = general.harvester_load_rate.max(1);
         let harvest_interval = (load_rate * 9).min(255) as u8;
-        // HarvesterDumpRate: minutes per bale. Multiply by 900 (60s * 15fps) for frames.
-        let dump_frames = (general.harvester_dump_rate * 900.0).clamp(0.0, 255.0) as u8;
-        let unload_interval = dump_frames.max(1);
+        let unload_interval = general.harvester_dump_frames.max(1);
 
         Self {
             local_continuation_radius: general.tiberium_short_scan.max(1) as u16,
