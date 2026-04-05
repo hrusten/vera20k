@@ -94,6 +94,7 @@ impl OverlayGrid {
         let idx = index_of(self.width, self.height, rx, ry)?;
         let prev = self.cells[idx].overlay_id;
         self.cells[idx] = OverlayCell::default();
+        self.dirty_cells.push((rx, ry));
         prev
     }
 
@@ -104,6 +105,7 @@ impl OverlayGrid {
                 overlay_id: Some(overlay_id),
                 overlay_data: data,
             };
+            self.dirty_cells.push((rx, ry));
         }
     }
 
@@ -113,6 +115,7 @@ impl OverlayGrid {
         if let Some(idx) = index_of(self.width, self.height, rx, ry) {
             if self.cells[idx].overlay_id.is_some() {
                 self.cells[idx].overlay_data = data;
+                self.dirty_cells.push((rx, ry));
             }
         }
     }
