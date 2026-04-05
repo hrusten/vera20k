@@ -433,4 +433,65 @@ mod tests {
         assert_eq!(occupied[1].0, 2);
         assert_eq!(occupied[1].1, 2);
     }
+
+    #[test]
+    fn place_overlay_pushes_dirty() {
+        let mut grid = OverlayGrid::new(10, 10);
+        assert!(grid.dirty_cells.is_empty());
+        grid.place_overlay(3, 4, 7, 0);
+        assert_eq!(grid.dirty_cells, vec![(3, 4)]);
+    }
+
+    #[test]
+    fn clear_overlay_pushes_dirty_when_in_bounds() {
+        let mut grid = OverlayGrid::new(10, 10);
+        grid.place_overlay(2, 2, 5, 0);
+        grid.dirty_cells.clear();
+        let prev = grid.clear_overlay(2, 2);
+        assert_eq!(prev, Some(5));
+        assert_eq!(grid.dirty_cells, vec![(2, 2)]);
+    }
+
+    #[test]
+    fn clear_overlay_no_push_when_out_of_bounds() {
+        let mut grid = OverlayGrid::new(10, 10);
+        let prev = grid.clear_overlay(100, 100);
+        assert_eq!(prev, None);
+        assert!(grid.dirty_cells.is_empty());
+    }
+
+    #[test]
+    fn set_overlay_data_pushes_only_when_cell_has_overlay() {
+        let mut grid = OverlayGrid::new(10, 10);
+        // No overlay → no push.
+        grid.set_overlay_data(1, 1, 42);
+        assert!(grid.dirty_cells.is_empty());
+        // With overlay → push.
+        grid.place_overlay(1, 1, 9, 0);
+        grid.dirty_cells.clear();
+        grid.set_overlay_data(1, 1, 42);
+        assert_eq!(grid.dirty_cells, vec![(1, 1)]);
+    }
+
+    #[test]
+    fn take_dirty_cells_returns_and_clears() {
+        let mut grid = OverlayGrid::new(10, 10);
+        grid.place_overlay(0, 0, 1, 0);
+        grid.place_overlay(1, 1, 2, 0);
+        let drained = grid.take_dirty_cells();
+        assert_eq!(drained, vec![(0, 0), (1, 1)]);
+        assert!(grid.dirty_cells.is_empty());
+        // Second take returns empty.
+        assert!(grid.take_dirty_cells().is_empty());
+    }
+
+    #[test]
+    fn dirty_cells_preserve_push_order() {
+        // Determinism: drain must iterate in push order.
+        let mut grid = OverlayGrid::new(10, 10);
+        grid.place_overlay(5, 5, 1, 0);
+        grid.place_overlay(0, 0, 2, 0);
+        grid.place_overlay(9, 3, 3, 0);
+        assert_eq!(grid.take_dirty_cells(), vec![(5, 5), (0, 0), (9, 3)]);
+    }
 }
