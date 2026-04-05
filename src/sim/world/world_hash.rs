@@ -148,7 +148,7 @@ impl Simulation {
             owner_id.hash(hasher);
             state.total_output.hash(hasher);
             state.total_drain.hash(hasher);
-            state.spy_blackout_remaining.hash(hasher);
+            state.power_blackout_remaining.hash(hasher);
             state.degradation_accum_ms.hash(hasher);
         }
     }
