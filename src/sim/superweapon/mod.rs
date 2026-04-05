@@ -13,6 +13,7 @@ pub mod force_shield;
 pub mod invulnerability;
 pub mod iron_curtain;
 pub mod lightning_storm;
+pub mod psychic_reveal;
 
 use crate::rules::ruleset::RuleSet;
 use crate::rules::superweapon_type::SuperWeaponKind;
