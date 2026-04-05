@@ -41,6 +41,11 @@ pub struct OverlayGrid {
     width: u16,
     height: u16,
     cells: Vec<OverlayCell>,
+    /// Cells mutated this tick — drained by the app layer to trigger
+    /// `recalc_overlay_passability`. Not part of game state; never serialized.
+    /// Always empty at tick boundaries (drained every tick after `advance_tick`).
+    #[serde(skip, default)]
+    dirty_cells: Vec<(u16, u16)>,
 }
 
 impl OverlayGrid {
@@ -51,6 +56,7 @@ impl OverlayGrid {
             width,
             height,
             cells: vec![OverlayCell::default(); count],
+            dirty_cells: Vec::new(),
         }
     }
 
@@ -149,6 +155,14 @@ impl OverlayGrid {
 
     pub fn height(&self) -> u16 {
         self.height
+    }
+
+    /// Drain the list of cells mutated since last call. Consumer (app layer)
+    /// calls `recalc_overlay_passability` for each and may trigger a zone rebuild.
+    ///
+    /// MUST be called every tick to keep the list empty at snapshot boundaries.
+    pub fn take_dirty_cells(&mut self) -> Vec<(u16, u16)> {
+        std::mem::take(&mut self.dirty_cells)
     }
 }
 
