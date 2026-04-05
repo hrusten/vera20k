@@ -42,3 +42,42 @@ pub fn launch(
 
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::ini_parser::IniFile;
+
+    fn minimal_rules() -> RuleSet {
+        let ini = IniFile::from_str(
+            "[InfantryTypes]\n[VehicleTypes]\n[AircraftTypes]\n[BuildingTypes]\n\
+             [General]\nPsychicRevealRadius=5\n",
+        );
+        RuleSet::from_ini(&ini).expect("test rules")
+    }
+
+    #[test]
+    fn pr_reveals_cells_in_radius() {
+        let rules = minimal_rules();
+        let mut sim = Simulation::new();
+        sim.fog.width = 30;
+        sim.fog.height = 30;
+        let owner = sim.interner.intern("Americans");
+        assert!(launch(&mut sim, &rules, owner, 10, 10));
+        let vis = sim.fog.by_owner.get(&owner).expect("owner fog exists");
+        assert!(vis.is_visible(10, 10));
+    }
+
+    #[test]
+    fn pr_does_not_reveal_beyond_radius() {
+        let rules = minimal_rules();
+        let mut sim = Simulation::new();
+        sim.fog.width = 30;
+        sim.fog.height = 30;
+        let owner = sim.interner.intern("Americans");
+        launch(&mut sim, &rules, owner, 10, 10);
+        let vis = sim.fog.by_owner.get(&owner).expect("owner fog exists");
+        // Radius=5, so (25, 25) is well outside.
+        assert!(!vis.is_visible(25, 25));
+    }
+}
