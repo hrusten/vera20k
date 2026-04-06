@@ -8,6 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::map::resolved_terrain::ResolvedTerrainGrid;
 use crate::rules::locomotor_type::{LocomotorKind, MovementZone};
+use crate::sim::pathfinding::EntityBlockEntry;
 use crate::sim::components::MovementTarget;
 use crate::sim::movement::locomotor::{LocomotorState, MovementLayer};
 use crate::sim::pathfinding::path_smooth;
@@ -162,8 +163,9 @@ pub(super) fn find_move_path(
     zone_mz: MovementZone,
     movement_zone: Option<MovementZone>,
     too_big_to_fit_under_bridge: bool,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<(Vec<(u16, u16)>, Vec<MovementLayer>)> {
     let grid = ctx.path_grid?;
     let zone_grid = ctx.zone_grid;
@@ -189,6 +191,7 @@ pub(super) fn find_move_path(
             movement_zone,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
         if let Some(path) = layered_result {
             log::trace!(
@@ -241,6 +244,7 @@ pub(super) fn find_move_path(
         resolved_terrain,
         entity_block_map,
         urgency,
+        mover_is_crusher,
     )?;
 
     let smooth_walkable = |x: u16, y: u16| -> bool {
@@ -304,8 +308,10 @@ pub(super) fn try_repath_after_block(
     movement_zone: Option<MovementZone>,
     too_big_to_fit_under_bridge: bool,
     mcfg: MovementConfig,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
+    is_infantry: bool,
 ) -> bool {
     let goal = target
         .final_goal
@@ -362,6 +368,7 @@ pub(super) fn try_repath_after_block(
         too_big_to_fit_under_bridge,
         entity_block_map,
         urgency,
+        mover_is_crusher,
     );
     let Some((new_path, new_layers)) = path_result else {
         target.movement_delay = mcfg.path_delay_ticks;
@@ -380,8 +387,12 @@ pub(super) fn try_repath_after_block(
         "path/path_layers desync after blocked repath"
     );
     target.next_index = 1;
-    target.blocked_delay = 0;
-    target.path_blocked = false;
+    // Infantry: clear blocking state on repath success (fresh grace period).
+    // Vehicles: keep both flags — permanent impatience after first blockage.
+    if is_infantry {
+        target.blocked_delay = 0;
+        target.path_blocked = false;
+    }
     target.movement_delay = mcfg.path_delay_ticks;
     let next = target.path[target.next_index];
     let dx = next.0 as i32 - current.0 as i32;

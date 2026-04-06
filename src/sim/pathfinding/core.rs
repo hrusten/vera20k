@@ -55,6 +55,24 @@ const CODE2_MULT_ROUTE_AROUND: i32 = 1000; // urgency=2 → route around blocker
 /// Matches the binary's `for (i = 0; i < 10; i++)` at 0x00429830.
 const CODE2_CHAIN_MAX_HOPS: usize = 10;
 
+/// Code-5 (enemy unit) cost multiplier. Binary DAT_0081870c[5] = 20.0.
+const CODE5_MULT_ENEMY: i32 = 20;
+
+/// Code-6 (stationary friendly) cost multiplier. Binary DAT_0081870c[6] = 8.0.
+const CODE6_MULT_STATIONARY_ALLY: i32 = 8;
+
+/// Entry in the entity soft-block map for A* cost computation.
+/// Carries the blocker's next cell (for code-2 chain walk) and the
+/// Can_Enter_Cell return code (2/5/6) that selects the cost multiplier.
+#[derive(Debug, Clone, Copy)]
+pub struct EntityBlockEntry {
+    /// For code-2 (moving friendly): the blocker's next cell in its path.
+    /// For codes 5/6: None (no chain walk — flat cost multiplier).
+    pub next_cell: Option<(u16, u16)>,
+    /// Can_Enter_Cell return code: 2 (moving friendly), 5 (enemy), 6 (stationary friendly).
+    pub cost_code: u8,
+}
+
 /// Per-direction tie-breaker offsets added to g-cost.
 /// Original engine adds tiny floats (0.001–0.008) from table at 0x0081872c.
 /// We scale by 10000 to stay in integer math: cardinals get lower values than
@@ -156,7 +174,10 @@ pub struct AStarOptions<'a> {
     /// cost function for the 10-hop chain walk (matches gamemd.exe
     /// AStar_compute_edge_cost). The map is denormalized so no EntityStore
     /// lookup is required inside A*.
-    pub entity_block_map: Option<&'a HashMap<(u16, u16), (u16, u16)>>,
+    pub entity_block_map: Option<&'a HashMap<(u16, u16), EntityBlockEntry>>,
+    /// Crusher units bypass all entity soft-block costs (codes 1-6).
+    /// Buildings (code 7, in entity_blocks BTreeSet) still block.
+    pub mover_is_crusher: bool,
     /// Code-2 urgency escalation (0 = look-ahead chain walk, 1 = traffic penalty,
     /// 2 = route around). Matches gamemd.exe PathfinderClass+0x3C.
     pub urgency: u8,
@@ -559,12 +580,17 @@ pub fn astar_search(
                 step_cost *= CLIFF_COST_MULTIPLIER;
             }
 
-            // Code-2 (friendly-moving blocker) dynamic cost. Goal cell is
-            // exempt — if the goal is occupied, we still want to reach it.
-            if (nx, ny) != goal {
+            // Entity soft-block cost (codes 2/5/6). Goal exempt. Crusher exempt.
+            if (nx, ny) != goal && !options.mover_is_crusher {
                 if let Some(map) = options.entity_block_map {
-                    if map.contains_key(&(nx, ny)) {
-                        step_cost *= compute_code2_multiplier(options.urgency, (nx, ny), map);
+                    if let Some(entry) = map.get(&(nx, ny)) {
+                        let mult = match entry.cost_code {
+                            2 => compute_code2_multiplier(options.urgency, (nx, ny), map),
+                            5 => CODE5_MULT_ENEMY,
+                            6 => CODE6_MULT_STATIONARY_ALLY,
+                            _ => 1,
+                        };
+                        step_cost *= mult;
                     }
                 }
             }
@@ -1128,7 +1154,7 @@ fn octile_heuristic(ax: u16, ay: u16, bx: u16, by: u16) -> i32 {
 fn compute_code2_multiplier(
     urgency: u8,
     start_cell: (u16, u16),
-    map: &HashMap<(u16, u16), (u16, u16)>,
+    map: &HashMap<(u16, u16), EntityBlockEntry>,
 ) -> i32 {
     if urgency >= 2 {
         return CODE2_MULT_ROUTE_AROUND;
@@ -1139,9 +1165,14 @@ fn compute_code2_multiplier(
     // urgency == 0: chain walk.
     let mut cur = start_cell;
     for _ in 0..CODE2_CHAIN_MAX_HOPS {
-        let Some(&next) = map.get(&cur) else {
-            // Chain clears: no blocker at this cell → the blocker upstream
-            // will vacate into free space.
+        let Some(entry) = map.get(&cur) else {
+            // No blocker at this cell → chain clears.
+            return CODE2_MULT_CLEARING;
+        };
+        let Some(next) = entry.next_cell else {
+            // Entry exists but has no next_cell (code 5/6 stationary) →
+            // chain terminates. The code-2 mover upstream IS vacating,
+            // so this counts as "clearing" from the mover's perspective.
             return CODE2_MULT_CLEARING;
         };
         if next == cur {
@@ -1183,8 +1214,9 @@ pub fn find_path_with_costs(
     entity_blocks: Option<&BTreeSet<(u16, u16)>>,
     movement_zone: Option<MovementZone>,
     resolved_terrain: Option<&ResolvedTerrainGrid>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<Vec<(u16, u16)>> {
     let steps = astar_search(
         grid,
@@ -1196,6 +1228,7 @@ pub fn find_path_with_costs(
             entity_blocks,
             entity_block_map,
             urgency,
+            mover_is_crusher,
             movement_zone,
             resolved_terrain,
             ..Default::default()
@@ -1215,8 +1248,9 @@ pub fn find_path_with_costs_corridor(
     allowed_zones: &BTreeSet<super::zone_map::ZoneId>,
     movement_zone: Option<MovementZone>,
     resolved_terrain: Option<&ResolvedTerrainGrid>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<Vec<(u16, u16)>> {
     let steps = astar_search(
         grid,
@@ -1229,6 +1263,7 @@ pub fn find_path_with_costs_corridor(
             corridor: Some((zone_map, allowed_zones)),
             entity_block_map,
             urgency,
+            mover_is_crusher,
             movement_zone,
             resolved_terrain,
             ..Default::default()
@@ -1297,8 +1332,9 @@ pub fn find_layered_path(
     start_layer: MovementLayer,
     goal: (u16, u16),
     terrain_costs: Option<&TerrainCostGrid>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<Vec<LayeredPathStep>> {
     if !matches!(start_layer, MovementLayer::Ground | MovementLayer::Bridge) {
         return None;
@@ -1314,6 +1350,7 @@ pub fn find_layered_path(
             bridge_blocks,
             entity_block_map,
             urgency,
+            mover_is_crusher,
             ..Default::default()
         },
     )

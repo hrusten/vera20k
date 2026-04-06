@@ -20,6 +20,8 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap, HashMap};
 
+use super::EntityBlockEntry;
+
 use super::terrain_cost::TerrainCostGrid;
 use super::zone_map::{ZONE_INVALID, ZoneAdjacency, ZoneGrid, ZoneId, ZoneMap};
 use super::{
@@ -70,8 +72,9 @@ pub fn find_path_zoned(
     mz: MovementZone,
     movement_zone: Option<MovementZone>,
     resolved_terrain: Option<&ResolvedTerrainGrid>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<Vec<(u16, u16)>> {
     if !can_use_reduced_zone_precheck(movement_zone) {
         return find_path_with_costs(
@@ -84,6 +87,7 @@ pub fn find_path_zoned(
             resolved_terrain,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     }
 
@@ -98,6 +102,7 @@ pub fn find_path_zoned(
             resolved_terrain,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     };
 
@@ -129,6 +134,7 @@ pub fn find_path_zoned(
             resolved_terrain,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     };
     let Some(adjacency) = zg.adjacency_for(mz) else {
@@ -142,6 +148,7 @@ pub fn find_path_zoned(
             resolved_terrain,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     };
 
@@ -160,6 +167,7 @@ pub fn find_path_zoned(
             resolved_terrain,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     }
 
@@ -183,6 +191,7 @@ pub fn find_path_zoned(
                 resolved_terrain,
                 entity_block_map,
                 urgency,
+                mover_is_crusher,
             ) {
                 return Some(path);
             }
@@ -209,6 +218,7 @@ pub fn find_path_zoned(
         resolved_terrain,
         entity_block_map,
         urgency,
+        mover_is_crusher,
     )
 }
 
@@ -228,8 +238,9 @@ pub fn find_layered_path_zoned(
     mz: MovementZone,
     terrain_costs: Option<&TerrainCostGrid>,
     movement_zone: Option<MovementZone>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     urgency: u8,
+    mover_is_crusher: bool,
 ) -> Option<Vec<LayeredPathStep>> {
     if !can_use_reduced_zone_precheck(movement_zone) {
         return find_layered_path(
@@ -242,6 +253,7 @@ pub fn find_layered_path_zoned(
             terrain_costs,
             entity_block_map,
             urgency,
+            mover_is_crusher,
         );
     }
 
@@ -270,6 +282,7 @@ pub fn find_layered_path_zoned(
         terrain_costs,
         entity_block_map,
         urgency,
+        mover_is_crusher,
     )
 }
 

@@ -13,6 +13,8 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::sim::pathfinding::EntityBlockEntry;
+
 use crate::map::entities::EntityCategory;
 use crate::rules::locomotor_type::MovementZone;
 use crate::sim::entity_store::EntityStore;
@@ -111,11 +113,11 @@ pub fn build_entity_block_sets(
 ) -> (
     BTreeSet<(u16, u16)>,
     BTreeSet<(u16, u16)>,
-    HashMap<(u16, u16), (u16, u16)>,
+    HashMap<(u16, u16), EntityBlockEntry>,
 ) {
     let mut ground_blocked: BTreeSet<(u16, u16)> = BTreeSet::new();
-    let mut bridge_blocked: BTreeSet<(u16, u16)> = BTreeSet::new();
-    let mut entity_block_map: HashMap<(u16, u16), (u16, u16)> = HashMap::new();
+    let bridge_blocked: BTreeSet<(u16, u16)> = BTreeSet::new();
+    let mut entity_block_map: HashMap<(u16, u16), EntityBlockEntry> = HashMap::new();
     for entity in entities.values() {
         // Entities inside transports don't occupy cells.
         if entity.passenger_role.is_inside_transport() {
@@ -127,37 +129,33 @@ pub fn build_entity_block_sets(
             continue;
         }
         let pos = (entity.position.rx, entity.position.ry);
-        let target_set = match layer {
-            MovementLayer::Bridge => &mut bridge_blocked,
-            _ => &mut ground_blocked,
-        };
         // Buildings always block (they never move). Always ground layer.
         if entity.category == EntityCategory::Structure {
             ground_blocked.insert(pos);
             continue;
         }
-        // Enemy units always block (stationary or not).
+        // Enemy units: soft-block with code 5 (cost 20x).
         let entity_owner_str = interner.resolve(entity.owner);
         let is_friendly =
             crate::map::houses::are_houses_friendly(alliances, mover_owner, entity_owner_str);
         if !is_friendly {
-            target_set.insert(pos);
+            entity_block_map.insert(pos, EntityBlockEntry { next_cell: None, cost_code: 5 });
             continue;
         }
-        // Friendly moving units: record the blocker's current cell → next cell
-        // mapping for the code-2 chain walk. Friendly units that have no next
-        // cell (idle or path exhausted) hard-block on their layer instead.
+        // Friendly moving units: code-2 chain walk entry.
         if let Some(ref mt) = entity.movement_target {
             if let Some(&next_cell) = mt.path.get(mt.next_index) {
                 if next_cell != pos {
-                    entity_block_map.insert(pos, next_cell);
+                    entity_block_map.insert(pos, EntityBlockEntry {
+                        next_cell: Some(next_cell),
+                        cost_code: 2,
+                    });
                     continue;
                 }
             }
         }
-        // Stationary friendly unit (no movement_target, exhausted path, or
-        // next == current) — blocks on its layer.
-        target_set.insert(pos);
+        // Stationary friendly: soft-block with code 6 (cost 8x).
+        entity_block_map.insert(pos, EntityBlockEntry { next_cell: None, cost_code: 6 });
     }
     (ground_blocked, bridge_blocked, entity_block_map)
 }
@@ -169,7 +167,7 @@ pub fn build_entity_block_set(
     mover_owner: &str,
     alliances: &crate::map::houses::HouseAllianceMap,
     interner: &crate::sim::intern::StringInterner,
-) -> (BTreeSet<(u16, u16)>, HashMap<(u16, u16), (u16, u16)>) {
+) -> (BTreeSet<(u16, u16)>, HashMap<(u16, u16), EntityBlockEntry>) {
     let (ground, bridge, entity_block_map) =
         build_entity_block_sets(entities, mover_owner, alliances, interner);
     (ground.union(&bridge).copied().collect(), entity_block_map)

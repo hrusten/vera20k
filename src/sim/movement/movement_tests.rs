@@ -2,6 +2,7 @@
 //! stuck recovery, and infantry sub-cell mechanics using minimal simulation setups.
 
 use super::*;
+use crate::map::entities::EntityCategory;
 use crate::map::terrain;
 use crate::sim::components::MovementTarget;
 use crate::sim::entity_store::EntityStore;
@@ -240,6 +241,7 @@ fn test_issue_move_command_sets_path() {
         None,
         None,
         None,
+        false,
     );
     assert!(result, "Should find a path on open grid");
 
@@ -277,6 +279,7 @@ fn test_issue_move_command_no_path() {
         None,
         None,
         None,
+        false,
     );
     assert!(!result, "Should fail with blocked path");
     let entity = entities.get(1).expect("entity exists");
@@ -304,6 +307,7 @@ fn test_issue_move_command_queue_appends_waypoint_path() {
         None,
         None,
         None,
+        false,
     ));
     assert!(issue_move_command(
         &mut entities,
@@ -315,6 +319,7 @@ fn test_issue_move_command_queue_appends_waypoint_path() {
         None,
         None,
         None,
+        false,
     ));
 
     let entity = entities.get(1).expect("entity exists");
@@ -351,6 +356,7 @@ fn test_tick_movement_repaths_when_next_cell_becomes_blocked() {
         None,
         None,
         None,
+        false,
     ));
 
     // Simulate a dynamic blocker appearing on the immediate next step.
@@ -457,6 +463,7 @@ fn test_repath_cooldown_prevents_thrashing_on_unrecoverable_block() {
         None,
         None,
         None,
+        false,
     ));
 
     // Make the route truly unreachable — block the entire column 2 so no
@@ -531,6 +538,7 @@ fn test_dynamic_occupancy_repath_routes_around_stationary_blocker() {
         None,
         None,
         None,
+        false,
     ));
 
     // With blockage_path_delay_ticks=60, the mover must wait ~60 ticks after
@@ -579,8 +587,9 @@ fn test_stuck_recovery_clears_unreachable_movement_target() {
         }
     }
 
-    // Stationary blocker at (3,3). Different owner so bump doesn't apply.
-    let blocker = GameEntity::test_default(1, "HTNK", "Soviet", 3, 3);
+    // Stationary building at (3,3). Buildings hard-block in entity_blocks BTreeSet.
+    let mut blocker = GameEntity::test_default(1, "GAWALL", "Soviet", 3, 3);
+    blocker.category = EntityCategory::Structure;
     entities.insert(blocker);
 
     let mover = GameEntity::test_default(2, "HTNK", "Americans", 1, 3);
@@ -596,6 +605,7 @@ fn test_stuck_recovery_clears_unreachable_movement_target() {
         None,
         None,
         None,
+        false,
     ));
 
     // path_stuck_counter starts at 10 (PATH_STUCK_INIT). Each failed repath
@@ -660,6 +670,7 @@ fn test_movement_tick_stats_report_blocked_attempts() {
         None,
         None,
         None,
+        false,
     ));
 
     let mut occupancy = OccupancyGrid::rebuild(&entities);
@@ -703,6 +714,7 @@ fn test_friendly_scatter_issues_move_command() {
         None,
         None,
         None,
+        false,
     ));
 
     let mut occupancy = OccupancyGrid::rebuild(&entities);
@@ -767,13 +779,18 @@ fn test_friendly_passable_moving_unit_not_blocked() {
     let (blocks, _penalty) =
         bump_crush::build_entity_block_set(&entities, "Americans", &alliances, &test_interner());
 
-    // Stationary friendly at (3,0) should be blocked.
-    assert!(blocks.contains(&(3, 0)), "Stationary friendly should block");
-    // Moving friendly at (4,0) should NOT be blocked.
+    // Stationary friendly at (3,0) is now soft-blocked (code 6, cost 8x) in
+    // entity_block_map, not in the hard-block BTreeSet.
+    assert!(!blocks.contains(&(3, 0)), "Stationary friendly should be soft-blocked, not hard-blocked");
+    assert!(_penalty.contains_key(&(3, 0)), "Stationary friendly should be in entity_block_map");
+    assert_eq!(_penalty[&(3, 0)].cost_code, 6, "Stationary friendly should have cost_code 6");
+    // Moving friendly at (4,0) should be in entity_block_map with code 2.
     assert!(
         !blocks.contains(&(4, 0)),
         "Moving friendly should be passable"
     );
+    assert!(_penalty.contains_key(&(4, 0)), "Moving friendly should be in entity_block_map");
+    assert_eq!(_penalty[&(4, 0)].cost_code, 2, "Moving friendly should have cost_code 2");
 }
 
 #[test]
@@ -801,8 +818,11 @@ fn test_enemy_unit_always_blocks_even_when_moving() {
     let (blocks, _penalty) =
         bump_crush::build_entity_block_set(&entities, "Americans", &alliances, &test_interner());
 
-    // Enemy at (3,0) should block even though it's moving.
-    assert!(blocks.contains(&(3, 0)), "Moving enemy should still block");
+    // Enemy at (3,0) is now soft-blocked (code 5, cost 20x) in entity_block_map,
+    // not in the hard-block BTreeSet.
+    assert!(!blocks.contains(&(3, 0)), "Enemy should be soft-blocked, not hard-blocked");
+    assert!(_penalty.contains_key(&(3, 0)), "Enemy should be in entity_block_map");
+    assert_eq!(_penalty[&(3, 0)].cost_code, 5, "Enemy should have cost_code 5");
 }
 
 #[test]
@@ -819,7 +839,7 @@ fn test_friendly_passable_path_goes_through_moving_friendly() {
     blocks.insert((3, 1));
 
     let path =
-        find_path_with_costs(&grid, (0, 0), (6, 0), None, Some(&blocks), None, None, None, 0);
+        find_path_with_costs(&grid, (0, 0), (6, 0), None, Some(&blocks), None, None, None, 0, false);
     assert!(
         path.is_some(),
         "Should find path through moving-friendly cell"
@@ -850,6 +870,7 @@ fn test_short_path_no_truncation() {
         None,
         None,
         None,
+        false,
     ));
 
     let entity = entities.get(1).expect("entity exists");
@@ -881,6 +902,7 @@ fn test_long_path_truncated_to_24_steps() {
         None,
         None,
         None,
+        false,
     ));
 
     let entity = entities.get(1).expect("entity exists");
@@ -915,6 +937,7 @@ fn test_segment_exhaustion_triggers_auto_repath() {
         None,
         None,
         None,
+        false,
     ));
 
     // Tick enough times to exhaust the first 24-step segment and auto-repath.
@@ -963,6 +986,7 @@ fn test_exact_24_step_path_no_repath_needed() {
         None,
         None,
         None,
+        false,
     ));
 
     let entity = entities.get(1).expect("entity exists");
@@ -1012,6 +1036,7 @@ fn test_auto_repath_fails_entity_stops() {
         None,
         None,
         None,
+        false,
     ));
 
     // After the path is issued, block column 25 completely so repath fails.
@@ -1065,6 +1090,7 @@ fn test_blocked_repath_uses_final_goal_not_segment_end() {
         None,
         None,
         None,
+        false,
     ));
 
     let entity = entities.get(1).expect("entity exists");

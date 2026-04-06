@@ -101,7 +101,7 @@ fn handle_path_exhaustion(
     ctx: PathfindingContext<'_>,
     entity_cost_grid: Option<&TerrainCostGrid>,
     mover_entity_blocks: Option<&BTreeSet<(u16, u16)>>,
-    mover_entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    mover_entity_block_map: Option<&HashMap<(u16, u16), crate::sim::pathfinding::EntityBlockEntry>>,
     path_delay_ticks: u16,
     sim_tick: u64,
 ) -> PathExhaustionResult {
@@ -158,6 +158,11 @@ fn handle_path_exhaustion(
                 snap.too_big_to_fit_under_bridge,
                 mover_entity_block_map,
                 0, // urgency=0: proactive segment repath, no block escalation
+                snap.omni_crusher
+                    || matches!(
+                        snap.locomotor.as_ref().map(|l| l.movement_zone),
+                        Some(MovementZone::Crusher | MovementZone::AmphibiousCrusher | MovementZone::CrusherAll)
+                    ),
             ) {
                 if new_path.len() >= 2 {
                     // DIAGNOSTIC: detect layer mismatch after repath
@@ -341,7 +346,7 @@ pub fn tick_movement_with_grids(
     // only stationary/enemy units hard-block. InternedId is Copy, so keys are cheap.
     let entity_block_sets: BTreeMap<
         crate::sim::intern::InternedId,
-        (BTreeSet<(u16, u16)>, HashMap<(u16, u16), (u16, u16)>),
+        (BTreeSet<(u16, u16)>, HashMap<(u16, u16), crate::sim::pathfinding::EntityBlockEntry>),
     > = mover_owners
         .iter()
         .map(|&owner_id| {
@@ -364,7 +369,7 @@ pub fn tick_movement_with_grids(
             snap.speed_type.and_then(|st| terrain_costs.get(&st));
         let (mover_entity_blocks, mover_entity_block_map): (
             Option<&BTreeSet<(u16, u16)>>,
-            Option<&HashMap<(u16, u16), (u16, u16)>>,
+            Option<&HashMap<(u16, u16), crate::sim::pathfinding::EntityBlockEntry>>,
         ) = entity_block_sets
             .get(&snap.owner)
             .map(|(b, m)| (Some(b), Some(m)))

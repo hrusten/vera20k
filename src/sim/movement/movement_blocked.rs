@@ -6,6 +6,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::rules::locomotor_type::MovementZone;
+use crate::sim::pathfinding::EntityBlockEntry;
 use crate::sim::components::MovementTarget;
 use crate::sim::debug_event_log::DebugEventKind;
 use crate::sim::movement::locomotor::{LocomotorState, MovementLayer};
@@ -37,12 +38,14 @@ pub(super) fn handle_blocked_tick(
     ctx: PathfindingContext<'_>,
     entity_cost_grid: Option<&TerrainCostGrid>,
     entity_blocks: Option<&BTreeSet<(u16, u16)>>,
-    entity_block_map: Option<&HashMap<(u16, u16), (u16, u16)>>,
+    entity_block_map: Option<&HashMap<(u16, u16), EntityBlockEntry>>,
     too_big_to_fit_under_bridge: bool,
     mcfg: MovementConfig,
     rng: &mut SimRng,
     sim_tick: u64,
     path_stuck_init: u8,
+    mover_is_crusher: bool,
+    is_infantry: bool,
 ) -> Vec<(u32, DebugEventKind)> {
     let mut deferred_events: Vec<(u32, DebugEventKind)> = Vec::new();
     stats.blocked_attempts = stats.blocked_attempts.saturating_add(1);
@@ -116,10 +119,14 @@ pub(super) fn handle_blocked_tick(
         mcfg,
         entity_block_map,
         urgency,
+        mover_is_crusher,
+        is_infantry,
     );
     if repath_ok {
         stats.repath_successes = stats.repath_successes.saturating_add(1);
-        target.path_blocked = false;
+        if is_infantry {
+            target.path_blocked = false;
+        }
         target.path_stuck_counter = path_stuck_init;
         deferred_events.push((
             sim_tick as u32,

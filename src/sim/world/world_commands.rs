@@ -44,6 +44,7 @@ struct MoveInfo {
     slowdown_distance: SimFixed,
     movement_zone: MovementZone,
     position: (u16, u16),
+    mover_is_crusher: bool,
 }
 
 impl Simulation {
@@ -81,6 +82,11 @@ impl Simulation {
             slowdown_distance: obj.map_or(SIM_ZERO, |o| SimFixed::from_num(o.slowdown_distance)),
             movement_zone: obj.map_or(MovementZone::Normal, |o| o.movement_zone),
             position: (e.position.rx, e.position.ry),
+            mover_is_crusher: e.omni_crusher
+                || matches!(
+                    loco.map(|l| l.movement_zone),
+                    Some(MovementZone::Crusher | MovementZone::AmphibiousCrusher | MovementZone::CrusherAll)
+                ),
         })
     }
 
@@ -189,6 +195,7 @@ impl Simulation {
                                 Some(&entity_blocks),
                                 self.resolved_terrain.as_ref(),
                                 Some(&entity_block_map),
+                                info.mover_is_crusher,
                             );
                         }
                     }
@@ -226,6 +233,7 @@ impl Simulation {
                         Some(&entity_blocks),
                         self.resolved_terrain.as_ref(),
                         Some(&entity_block_map),
+                        info.mover_is_crusher,
                     )
                 };
                 // Stamp acceleration/deceleration parameters onto the newly created
@@ -392,6 +400,7 @@ impl Simulation {
                         Some(&entity_blocks),
                         self.resolved_terrain.as_ref(),
                         Some(&entity_block_map),
+                        info.mover_is_crusher,
                     )
                 };
                 if issued {
@@ -556,6 +565,7 @@ impl Simulation {
                     .as_ref()
                     .map(|i| i.speed_type)
                     .unwrap_or(SpeedType::Track);
+                let crusher = info.as_ref().map_or(false, |i| i.mover_is_crusher);
                 let (entity_blocks, entity_block_map) = bump_crush::build_entity_block_set(
                     &self.entities,
                     command_owner,
@@ -575,6 +585,7 @@ impl Simulation {
                         Some(&entity_blocks),
                         self.resolved_terrain.as_ref(),
                         Some(&entity_block_map),
+                        crusher,
                     );
                 }
                 true
@@ -636,6 +647,7 @@ impl Simulation {
                     .as_ref()
                     .map(|i| i.speed_type)
                     .unwrap_or(SpeedType::Track);
+                let crusher = info.as_ref().map_or(false, |i| i.mover_is_crusher);
                 let (entity_blocks, entity_block_map) = bump_crush::build_entity_block_set(
                     &self.entities,
                     command_owner,
@@ -655,6 +667,7 @@ impl Simulation {
                         Some(&entity_blocks),
                         self.resolved_terrain.as_ref(),
                         Some(&entity_block_map),
+                        crusher,
                     );
                 }
                 true
@@ -754,6 +767,7 @@ impl Simulation {
                     .as_ref()
                     .map(|i| i.speed_type)
                     .unwrap_or(crate::rules::locomotor_type::SpeedType::Foot);
+                let crusher = info.as_ref().map_or(false, |i| i.mover_is_crusher);
                 let (entity_blocks, entity_block_map) =
                     crate::sim::movement::bump_crush::build_entity_block_set(
                         &self.entities,
@@ -774,6 +788,7 @@ impl Simulation {
                         Some(&entity_blocks),
                         self.resolved_terrain.as_ref(),
                         Some(&entity_block_map),
+                        crusher,
                     );
                 }
                 true
